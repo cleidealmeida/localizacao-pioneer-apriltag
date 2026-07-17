@@ -1,0 +1,41 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# --- ROS2 ---
+build/
+install/
+log/
+
+# --- MATLAB ---
+*.asv
+*.autosave
+slprj/
+*.slxc
+
+# --- Calibração / dados grandes ---
+imagens/
+*.jpg
+*.jpeg
+*.png
+!docs/**/*.png
+calib.npz
+*.mat
+!Base_de_dados/**/*.xlsx
+
+# --- Logs e resultados de experimento ---
+resultados_experimentos.csv
+*.fig
+
+# --- Config sensível gerada localmente ---
+config/camera_extrinsics.yaml
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+*.log
