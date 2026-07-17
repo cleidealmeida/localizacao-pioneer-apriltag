@@ -1,0 +1,15 @@
+# ADIÇÃO ao config/cameras.yaml (parte 3)
+# Acrescente esta seção no nível raiz do seu cameras.yaml.
+#
+# robot_T_tag: pose da AprilTag no referencial do ROBÔ (matriz homogênea 4x4).
+# É o r_H_t do main_controller.m antigo — a tag não fica no centro do Pioneer,
+# fica deslocada (-0.165 m em x, +0.145 m em z) e "de cabeça pra baixo" em
+# relação ao frame do robô. CONFIRA fisicamente se a montagem atual ainda
+# corresponde a estes valores (medir com trena a posição da tag em relação ao
+# ponto médio entre as rodas).
+
+robot_T_tag:
+  - [ 0.0, -1.0,  0.0, -0.165]
+  - [-1.0,  0.0,  0.0,  0.000]
+  - [ 0.0,  0.0, -1.0,  0.145]
+  - [ 0.0,  0.0,  0.0,  1.000]
