@@ -17,22 +17,28 @@ log/
 slprj/
 *.slxc
 
-# --- Calibração / dados grandes ---
+# --- Calibração / dados locais (gerados no laboratório) ---
 imagens/
-*.jpg
-*.jpeg
-*.png
-!docs/**/*.png
 calib.npz
-*.mat
-!Base_de_dados/**/*.xlsx
+config/cameras.yaml
+**/Calibration/*.cal
+
+# --- ARIA: artefatos de build e binários pesados ---
+**/ARIA/obj/
+*.pdb
+*.tlog
+*.exe
 
 # --- Logs e resultados de experimento ---
 resultados_experimentos.csv
 *.fig
+rosbag2_*/
 
-# --- Config sensível gerada localmente ---
-config/camera_extrinsics.yaml
+# --- Modelos e imagens (exceções para o que faz parte do código) ---
+*.jpg
+*.jpeg
+*.png
+!docs/**/*.png
 
 # --- OS / editor ---
 .DS_Store

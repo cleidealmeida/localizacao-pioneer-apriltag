@@ -1,0 +1,32 @@
+# Config RViz2 para depurar a localização (máquina Ubuntu):
+#   rviz2 -d config/localizacao.rviz
+# Mostra: fusão (verde), medições por câmera (vermelho/azul) e odometria.
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Global Options:
+    Fixed Frame: world
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+    - Class: rviz_default_plugins/PoseWithCovariance
+      Name: RobotPose (fusao)
+      Topic: {Value: /robot_pose}
+      Color: 0; 255; 0
+      Enabled: true
+    - Class: rviz_default_plugins/Pose
+      Name: Camera1 (mundo)
+      Topic: {Value: /apriltag/camera_1/pose_world}
+      Color: 255; 0; 0
+      Enabled: true
+    - Class: rviz_default_plugins/Pose
+      Name: Camera2 (mundo)
+      Topic: {Value: /apriltag/camera_2/pose_world}
+      Color: 0; 0; 255
+      Enabled: true
+    - Class: rviz_default_plugins/Odometry
+      Name: Odometria
+      Topic: {Value: /pose}
+      Enabled: true
