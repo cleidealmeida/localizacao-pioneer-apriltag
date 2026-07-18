@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arena NERO — Simulador · Ao Vivo · Robô Virtual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E14; --panel:#12161FE6; --line:#232B38; --txt:#E8EDF2; --dim:#8B96A5;
+    --cyan:#37C8D6; --amber:#E5A13D; --violet:#9B7BFF; --ok:#4ADE80; --red:#F0564A;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; overflow:hidden; background:var(--bg); color:var(--txt);
+    font-family:'Rajdhani',sans-serif;}
+  #scene{position:fixed; inset:0;}
+  #title{position:fixed; top:14px; left:16px; z-index:5; pointer-events:none;}
+  #title h1{font-size:17px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;}
+  #title span{font-size:11px; color:var(--dim); letter-spacing:.08em;}
+  #hint{position:fixed; right:16px; top:14px; z-index:5; font-size:11px; color:var(--dim);
+    letter-spacing:.06em; text-align:right; pointer-events:none;}
+  #panel{position:fixed; top:60px; left:16px; width:280px; z-index:5;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    backdrop-filter:blur(6px); max-height:calc(100vh - 140px); overflow-y:auto;}
+  #panel::-webkit-scrollbar{width:6px;} #panel::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px;}
+  .sec{padding:12px 14px; border-bottom:1px solid var(--line);}
+  .sec:last-child{border-bottom:none;}
+  .sec h2{font-size:11px; font-weight:600; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--dim); margin-bottom:9px;}
+  .row{display:flex; gap:8px; margin-bottom:8px; align-items:center;}
+  .row:last-child{margin-bottom:0;}
+  .row label{flex:1; font-size:13px; font-weight:500;}
+  .row input[type=number],.row input[type=text]{background:#0B0E14; border:1px solid var(--line);
+    border-radius:4px; color:var(--cyan); font-family:'IBM Plex Mono',monospace; font-size:12px; padding:4px 6px;}
+  .row input[type=number]{width:64px; text-align:right;}
+  .row input[type=text]{flex:1.4; min-width:0;}
+  .row input:focus{outline:1px solid var(--cyan); border-color:var(--cyan);}
+  textarea{width:100%; background:#0B0E14; border:1px solid var(--line); border-radius:4px;
+    color:var(--txt); font-family:'IBM Plex Mono',monospace; font-size:10px; padding:6px; resize:vertical;}
+  textarea:focus{outline:1px solid var(--cyan);}
+  button{font-family:'Rajdhani',sans-serif; font-weight:600; letter-spacing:.06em; font-size:13px;
+    background:#1A2130; color:var(--txt); border:1px solid var(--line); border-radius:5px;
+    padding:6px 12px; cursor:pointer;}
+  button:hover{border-color:var(--cyan); color:var(--cyan);}
+  button:focus-visible{outline:2px solid var(--cyan); outline-offset:1px;}
+  button.primary{background:var(--cyan); color:#06252A; border-color:var(--cyan);}
+  button.primary:hover{filter:brightness(1.1); color:#06252A;}
+  button.danger{border-color:var(--red); color:var(--red);}
+  .btnrow{display:flex; gap:8px; flex-wrap:wrap;}
+  .status{font-size:11px; margin-top:6px; color:var(--dim); font-family:'IBM Plex Mono',monospace;}
+  .status.ok{color:var(--ok);} .status.err{color:var(--red);}
+  .seg{display:flex; border:1px solid var(--line); border-radius:5px; overflow:hidden; margin-bottom:9px;}
+  .seg button{flex:1; border:none; border-radius:0; background:transparent; padding:6px 4px; font-size:12px;}
+  .seg button.active{background:var(--cyan); color:#06252A;}
+  .legend{display:flex; flex-direction:column; gap:5px; font-size:12px;}
+  .legend div{display:flex; align-items:center; gap:8px; color:var(--dim);}
+  .dot{width:10px; height:10px; border-radius:2px; flex:none;}
+  .taglist .row{margin-bottom:5px;}
+  .taglist input[type=number]{width:52px;}
+  .mini{font-size:11px; color:var(--dim); margin-top:5px; line-height:1.45;}
+  .mini code{color:var(--txt); font-family:'IBM Plex Mono',monospace; font-size:10px;}
+  #telemetry{position:fixed; left:16px; right:16px; bottom:14px; z-index:5;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    backdrop-filter:blur(6px); display:flex; align-items:center; padding:8px 6px;
+    overflow-x:auto; white-space:nowrap;}
+  .tcell{padding:2px 14px; border-right:1px solid var(--line); flex:none;}
+  .tcell:last-child{border-right:none;}
+  .tcell .k{font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim);}
+  .tcell .v{font-size:15px; font-family:'IBM Plex Mono',monospace;}
+  .badge{display:inline-block; padding:1px 8px; border-radius:3px; font-size:12px; margin-right:4px;
+    font-family:'IBM Plex Mono',monospace; border:1px solid var(--line); color:var(--dim);}
+  .badge.on{border-color:var(--ok); color:var(--ok);}
+  #connDot{display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--red); margin-right:6px;}
+  #connDot.on{background:var(--ok);}
+  #wdBanner{position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:6;
+    background:#3A2A08; border:1px solid var(--amber); color:var(--amber);
+    font-family:'IBM Plex Mono',monospace; font-size:12px; padding:5px 14px;
+    border-radius:6px; display:none; letter-spacing:.08em;}
+  @media (max-width:720px){ #panel{width:242px;} .tcell{padding:2px 9px;} }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+<div id="title">
+  <h1>Arena NERO</h1>
+  <span>Simulador · Ao vivo · Robô virtual · Replay</span>
+</div>
+<div id="hint">arrastar: orbitar · scroll: zoom · shift+arrastar: mover · espaço: pausa</div>
+<div id="wdBanner">POSE OBSOLETA</div>
+
+<div id="panel">
+  <div class="sec">
+    <h2>Modo</h2>
+    <div class="seg">
+      <button id="modeSim" class="active">Simulação</button>
+      <button id="modeLive">Ao vivo</button>
+      <button id="modeVirt">Robô virtual</button>
+      <button id="modeReplay">Replay</button>
+    </div>
+    <div id="connCfg" style="display:none;">
+      <div class="row"><input id="wsUrl" type="text" value="ws://192.168.0.10:9090" spellcheck="false" aria-label="Endereço do rosbridge"></div>
+      <div class="btnrow"><button id="connectBtn" class="primary">Conectar</button></div>
+      <div class="status" id="connStatus">desconectado</div>
+      <div class="mini">Ubuntu: <code>ros2 launch rosbridge_server rosbridge_websocket_launch.xml</code></div>
+    </div>
+  </div>
+
+  <div class="sec" id="liveSec" style="display:none;">
+    <h2>Ao vivo — tópicos</h2>
+    <div class="row"><label for="tRobot">Fusão</label><input id="tRobot" type="text" value="/robot_pose"></div>
+    <div class="row"><label for="tOdom">Odometria</label><input id="tOdom" type="text" value="/pose"></div>
+    <div class="row"><label for="tGest">Gestos</label><input id="tGest" type="text" value="/Gesture"></div>
+    <div class="row"><label for="tOpt">OptiTrack (GT)</label><input id="tOpt" type="text" value="/optitrack_pose"></div>
+    <div class="row"><label for="showCov">Elipse de covariância</label><input id="showCov" type="checkbox" checked style="accent-color:var(--cyan);"></div>
+    <div class="row"><label for="showMeasEll">Elipses por câmera</label><input id="showMeasEll" type="checkbox" checked style="accent-color:var(--cyan);"></div>
+    <div class="row"><label for="sigB">σ base medição [m]</label><input id="sigB" type="number" step="0.005" min="0" value="0.02"></div>
+    <div class="row"><label for="sigK">k dist² [1/m]</label><input id="sigK" type="number" step="0.005" min="0" value="0.01"></div>
+    <div class="row"><label for="poseTo">Watchdog pose [s]</label><input id="poseTo" type="number" step="0.1" min="0.2" value="1.0"></div>
+    <div class="mini" id="netDiag"></div>
+  </div>
+
+  <div class="sec" id="virtSec" style="display:none;">
+    <h2>Robô virtual (SIL)</h2>
+    <div class="mini" style="margin:0 0 8px;">O site vira o "Pioneer": assina
+      <code>/cmd_vel</code> do seu MATLAB, publica <code>/pose</code> e as
+      medições <code>pose_raw</code> das câmeras — pipeline completo
+      (MATLAB + pose_estimator) sem hardware.</div>
+    <div class="row"><label for="slip">Deslizamento odom [%]</label><input id="slip" type="number" min="0" max="15" step="0.5" value="2"></div>
+    <div class="row"><label for="odomNoise">Ruído odom [mm/passo]</label><input id="odomNoise" type="number" min="0" max="10" step="0.5" value="1"></div>
+    <div class="row"><label for="measNoise">Ruído medição [cm]</label><input id="measNoise" type="number" min="0" max="10" step="0.5" value="2"></div>
+    <div class="row"><label for="pDetect">Taxa de detecção [%]</label><input id="pDetect" type="number" min="10" max="100" step="5" value="85"></div>
+    <div class="row"><label for="pubMeas">Publicar pose_raw</label><input id="pubMeas" type="checkbox" checked style="accent-color:var(--cyan);"></div>
+    <div class="btnrow"><button id="virtReset">Reposicionar na origem</button></div>
+    <div class="status" id="virtStatus">aguardando conexão</div>
+  </div>
+
+  <div class="sec" id="replaySec" style="display:none;">
+    <h2>Replay — trajetória gravada</h2>
+    <input type="file" id="replayFile" accept=".csv" style="width:100%;font-size:11px;color:var(--dim);">
+    <div class="row" style="margin-top:8px;"><input id="replaySlider" type="range" min="0" max="1000" value="0" style="width:100%;accent-color:var(--cyan);" aria-label="Posição no tempo"></div>
+    <div class="btnrow"><button id="replayPlay" class="primary">Reproduzir</button></div>
+    <div class="row" style="margin-top:8px;"><label for="replaySpeed">Velocidade ×</label><input id="replaySpeed" type="number" step="0.5" min="0.5" max="10" value="1"></div>
+    <div class="status" id="replayStatus">carregue o CSV de trajetória (main_controller v4)</div>
+  </div>
+
+  <div class="sec">
+    <h2>Sala</h2>
+    <div class="row"><label for="dimC">Comprimento X [m]</label><input id="dimC" type="number" step="0.5" min="2" value="8"></div>
+    <div class="row"><label for="dimL">Largura Y [m]</label><input id="dimL" type="number" step="0.5" min="2" value="7"></div>
+    <div class="row"><label for="dimA">Altura Z [m]</label><input id="dimA" type="number" step="0.5" min="1.5" value="3"></div>
+    <div class="row"><label for="origX">Origem: dist. parede X [m]</label><input id="origX" type="number" step="0.25" value="4"></div>
+    <div class="row"><label for="origY">Origem: dist. parede Y [m]</label><input id="origY" type="number" step="0.25" value="3.5"></div>
+  </div>
+
+  <div class="sec">
+    <h2>Câmeras — cameras.yaml <span id="camCount" style="color:var(--cyan)"></span></h2>
+    <textarea id="yamlBox" rows="8" spellcheck="false"></textarea>
+    <div class="btnrow" style="margin-top:8px;">
+      <button id="applyYaml" class="primary">Aplicar</button>
+      <button id="addCam">+ Câmera</button>
+      <button id="resetYaml">Exemplo</button>
+    </div>
+    <div class="row" style="margin-top:9px;"><label for="fovH">FOV horizontal [°]</label><input id="fovH" type="number" min="20" max="120" value="62"></div>
+    <div class="row"><label for="fovV">FOV vertical [°]</label><input id="fovV" type="number" min="15" max="100" value="48"></div>
+    <div class="row"><label for="range">Alcance [m]</label><input id="range" type="number" min="1" max="20" step="0.5" value="6.5"></div>
+    <div class="status" id="yamlStatus">usando câmeras de exemplo</div>
+  </div>
+
+  <div class="sec">
+    <h2>Tags estáticas</h2>
+    <div class="taglist" id="tagList"></div>
+    <div class="btnrow"><button id="addTag">+ Tag</button></div>
+  </div>
+
+  <div class="sec" id="simSec">
+    <h2>Robôs (simulação)</h2>
+    <div class="row"><label for="nRobots">Quantidade</label><input id="nRobots" type="number" min="1" max="6" value="1"></div>
+    <div class="btnrow">
+      <button id="playBtn" class="primary">Pausar</button>
+      <button id="resetBtn">Reiniciar</button>
+    </div>
+    <div class="row" style="margin-top:9px;"><label for="speed">Velocidade ×</label><input id="speed" type="number" step="0.5" min="0.5" max="10" value="2"></div>
+  </div>
+
+  <div class="sec">
+    <h2>Exibição</h2>
+    <div class="row"><label for="showFrustum">Frustums</label><input id="showFrustum" type="checkbox" checked style="accent-color:var(--cyan);"></div>
+    <div class="row"><label for="showTrail">Trajetórias</label><input id="showTrail" type="checkbox" checked style="accent-color:var(--cyan);"></div>
+    <div class="row"><label for="showGhost">Odometria (fantasma)</label><input id="showGhost" type="checkbox" checked style="accent-color:var(--cyan);"></div>
+    <div class="row"><label for="followRobot">Câmera segue o robô</label><input id="followRobot" type="checkbox" style="accent-color:var(--cyan);"></div>
+  </div>
+
+  <div class="sec">
+    <h2>Configuração</h2>
+    <div class="btnrow">
+      <button id="copyLink">Copiar link</button>
+      <button id="clearCfg" class="danger">Limpar salvo</button>
+    </div>
+    <div class="status" id="cfgStatus">config salva automaticamente neste navegador</div>
+  </div>
+
+  <div class="sec">
+    <h2>Legenda</h2>
+    <div class="legend">
+      <div><span class="dot" style="background:var(--cyan)"></span>Robô (verdade / fusão)</div>
+      <div><span class="dot" style="background:#5A6474"></span>Odometria (fantasma)</div>
+      <div><span class="dot" style="background:#E8EDF2"></span>OptiTrack (ground truth)</div>
+      <div><span class="dot" style="background:var(--amber)"></span>Câmeras (cores por índice)</div>
+      <div><span class="dot" style="background:var(--red)"></span>Alvo ativo</div>
+      <div><span class="dot" style="background:var(--ok)"></span>Detecção / medição</div>
+    </div>
+  </div>
+</div>
+
+<div id="telemetry">
+  <div class="tcell"><div class="k">modo</div><div class="v"><span id="connDot"></span><span id="tv_mode">SIM</span></div></div>
+  <div class="tcell"><div class="k">t</div><div class="v" id="tv_t">0.0 s</div></div>
+  <div class="tcell"><div class="k">x</div><div class="v" id="tv_x">0.000</div></div>
+  <div class="tcell"><div class="k">y</div><div class="v" id="tv_y">0.000</div></div>
+  <div class="tcell"><div class="k">ψ</div><div class="v" id="tv_psi">0°</div></div>
+  <div class="tcell"><div class="k">u / ω</div><div class="v" id="tv_uw">— / —</div></div>
+  <div class="tcell"><div class="k">alvo/gesto</div><div class="v" id="tv_alvo">—</div></div>
+  <div class="tcell"><div class="k">detecção</div><div class="v" id="badges"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<script>
+"use strict";
+/* Mundo Z-up (origem = tag de referência); Three Y-up: three=(x,z,-y).
+   Câmeras OpenCV (z-forward). robot_T_tag idêntico ao cameras.yaml do projeto. */
+const W2T=v=>new THREE.Vector3(v[0],v[2],-v[1]);
+const CAM_COLORS=[0xE5A13D,0x9B7BFF,0xF472B6,0xA3E635,0x60A5FA,0xFB923C];
+const ROBOT_COLORS=[0x37C8D6,0xF0564A,0xA3E635,0xF472B6,0x60A5FA,0xE5A13D];
+let ROBOT_T_TAG=[[0,-1,0,-0.165],[-1,0,0,0],[0,0,-1,0.145],[0,0,0,1]];
+
+// ===== álgebra 4x4 =====
+function mul4(A,B){
+  const C=[[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+  for(let i=0;i<4;i++)for(let j=0;j<4;j++)
+    C[i][j]=A[i][0]*B[0][j]+A[i][1]*B[1][j]+A[i][2]*B[2][j]+A[i][3]*B[3][j];
+  return C;
+}
+function invRigid(T){
+  const Rt=[[T[0][0],T[1][0],T[2][0]],[T[0][1],T[1][1],T[2][1]],[T[0][2],T[1][2],T[2][2]]];
+  const t=[T[0][3],T[1][3],T[2][3]];
+  const nt=[-(Rt[0][0]*t[0]+Rt[0][1]*t[1]+Rt[0][2]*t[2]),
+            -(Rt[1][0]*t[0]+Rt[1][1]*t[1]+Rt[1][2]*t[2]),
+            -(Rt[2][0]*t[0]+Rt[2][1]*t[1]+Rt[2][2]*t[2])];
+  return[[Rt[0][0],Rt[0][1],Rt[0][2],nt[0]],
+         [Rt[1][0],Rt[1][1],Rt[1][2],nt[1]],
+         [Rt[2][0],Rt[2][1],Rt[2][2],nt[2]],[0,0,0,1]];
+}
+function poseZ(x,y,psi){
+  const c=Math.cos(psi),s=Math.sin(psi);
+  return[[c,-s,0,x],[s,c,0,y],[0,0,1,0],[0,0,0,1]];
+}
+function mat3ToQuat(T){
+  const m00=T[0][0],m01=T[0][1],m02=T[0][2],m10=T[1][0],m11=T[1][1],m12=T[1][2],
+        m20=T[2][0],m21=T[2][1],m22=T[2][2];
+  const tr=m00+m11+m22;let x,y,z,w;
+  if(tr>0){const S=Math.sqrt(tr+1)*2;w=S/4;x=(m21-m12)/S;y=(m02-m20)/S;z=(m10-m01)/S;}
+  else if(m00>m11&&m00>m22){const S=Math.sqrt(1+m00-m11-m22)*2;w=(m21-m12)/S;x=S/4;y=(m01+m10)/S;z=(m02+m20)/S;}
+  else if(m11>m22){const S=Math.sqrt(1+m11-m00-m22)*2;w=(m02-m20)/S;x=(m01+m10)/S;y=S/4;z=(m12+m21)/S;}
+  else{const S=Math.sqrt(1+m22-m00-m11)*2;w=(m10-m01)/S;x=(m02+m20)/S;y=(m12+m21)/S;z=S/4;}
+  return{x,y,z,w};
+}
+function quatYaw(q){return Math.atan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z));}
+function yawQuat(psi){return{x:0,y:0,z:Math.sin(psi/2),w:Math.cos(psi/2)};}
+function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function stampNow(){const ms=Date.now();return{sec:Math.floor(ms/1000),nanosec:(ms%1000)*1e6};}
+
+// ===== cena =====
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0B0E14);
+scene.fog=new THREE.Fog(0x0B0E14,18,40);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+document.getElementById('scene').appendChild(renderer.domElement);
+const camera3=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.05,200);
+scene.add(new THREE.AmbientLight(0xffffff,.55));
+const keyL=new THREE.DirectionalLight(0xffffff,.7);keyL.position.set(6,10,4);scene.add(keyL);
+
+const orbit={theta:-Math.PI/3.4,phi:1.05,r:11,target:new THREE.Vector3(0,.4,0)};
+function applyOrbit(){
+  orbit.phi=Math.max(.12,Math.min(Math.PI/2-.03,orbit.phi));
+  orbit.r=Math.max(2,Math.min(45,orbit.r));
+  camera3.position.set(
+    orbit.target.x+orbit.r*Math.sin(orbit.phi)*Math.cos(orbit.theta),
+    orbit.target.y+orbit.r*Math.cos(orbit.phi),
+    orbit.target.z+orbit.r*Math.sin(orbit.phi)*Math.sin(orbit.theta));
+  camera3.lookAt(orbit.target);
+}
+applyOrbit();
+let drag=null;
+renderer.domElement.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,pan:e.shiftKey||e.button===2};});
+addEventListener('pointerup',()=>drag=null);
+addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
+  if(drag.pan){
+    const s=orbit.r*.0012;
+    const right=new THREE.Vector3().subVectors(camera3.position,orbit.target).cross(camera3.up).normalize();
+    orbit.target.addScaledVector(right,dx*s);orbit.target.y+=dy*s;
+  }else{orbit.theta+=dx*.0055;orbit.phi-=dy*.0055;}
+  applyOrbit();
+});
+renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();orbit.r*=(1+Math.sign(e.deltaY)*.09);applyOrbit();},{passive:false});
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('keydown',e=>{
+  if(e.code==='Space'&&mode==='sim'&&document.activeElement.tagName!=='INPUT'
+     &&document.activeElement.tagName!=='TEXTAREA'){
+    e.preventDefault();document.getElementById('playBtn').click();
+  }
+});
+
+function textSprite(txt,color,size=.42){
+  const c=document.createElement('canvas');c.width=128;c.height=128;
+  const g=c.getContext('2d');
+  g.font='700 84px Rajdhani, sans-serif';g.textAlign='center';g.textBaseline='middle';
+  g.fillStyle=color;g.fillText(txt,64,70);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));
+  sp.scale.set(size,size,1);return sp;
+}
+function checkerTex(n=8){
+  const c=document.createElement('canvas');c.width=c.height=n*8;
+  const g=c.getContext('2d');
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){g.fillStyle=(i+j)%2?'#0a0a0a':'#e8e8e8';g.fillRect(i*8,j*8,8,8);}
+  return new THREE.CanvasTexture(c);
+}
+
+// ===== sala =====
+const room={C:8,L:7,A:3,ox:4,oy:3.5};
+let roomGroup=null;
+function buildRoom(){
+  if(roomGroup)scene.remove(roomGroup);
+  roomGroup=new THREE.Group();
+  const{C,L,A,ox,oy}=room,x0=-ox,x1=C-ox,y0=-oy,y1=L-oy;
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(C,L),
+    new THREE.MeshStandardMaterial({color:0x0E1420,roughness:.95}));
+  floor.rotation.x=-Math.PI/2;
+  floor.position.copy(W2T([(x0+x1)/2,(y0+y1)/2,0]));floor.position.y=-.001;
+  roomGroup.add(floor);
+  const gpts=[];
+  for(let x=Math.ceil(x0*2)/2;x<=x1+1e-6;x+=.5){gpts.push(W2T([x,y0,0]),W2T([x,y1,0]));}
+  for(let y=Math.ceil(y0*2)/2;y<=y1+1e-6;y+=.5){gpts.push(W2T([x0,y,0]),W2T([x1,y,0]));}
+  roomGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(gpts),
+    new THREE.LineBasicMaterial({color:0x1E2632})));
+  const cor=[[x0,y0],[x1,y0],[x1,y1],[x0,y1]],wpts=[];
+  for(let i=0;i<4;i++){
+    const a=cor[i],b=cor[(i+1)%4];
+    wpts.push(W2T([a[0],a[1],0]),W2T([b[0],b[1],0]));
+    wpts.push(W2T([a[0],a[1],A]),W2T([b[0],b[1],A]));
+    wpts.push(W2T([a[0],a[1],0]),W2T([a[0],a[1],A]));
+  }
+  roomGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(wpts),
+    new THREE.LineBasicMaterial({color:0x33405A})));
+  const wmat=new THREE.MeshBasicMaterial({color:0x14202F,transparent:true,opacity:.14,side:THREE.DoubleSide,depthWrite:false});
+  const mk=(w,h,pos,rotY)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),wmat);m.position.copy(pos);m.rotation.y=rotY;roomGroup.add(m);};
+  mk(C,A,W2T([(x0+x1)/2,y0,A/2]),0);mk(C,A,W2T([(x0+x1)/2,y1,A/2]),0);
+  mk(L,A,W2T([x0,(y0+y1)/2,A/2]),Math.PI/2);mk(L,A,W2T([x1,(y0+y1)/2,A/2]),Math.PI/2);
+  const tag=new THREE.Mesh(new THREE.PlaneGeometry(.196,.196),
+    new THREE.MeshBasicMaterial({map:checkerTex()}));
+  tag.rotation.x=-Math.PI/2;tag.position.y=.002;roomGroup.add(tag);
+  const ax=(v,c)=>roomGroup.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([W2T([0,0,.003]),W2T(v)]),
+    new THREE.LineBasicMaterial({color:c})));
+  ax([.5,0,0],0xF0564A);ax([0,.5,0],0x4ADE80);ax([0,0,.5],0x5B8CFF);
+  const olab=textSprite('O','#8B96A5',.3);olab.position.set(.18,.1,.18);roomGroup.add(olab);
+  scene.add(roomGroup);
+}
+
+// ===== câmeras =====
+let cams=[],camGroup=null;
+const fovCfg={h:62,v:48,range:6.5};
+function makeExtrinsics(pos,look){
+  const z=[look[0]-pos[0],look[1]-pos[1],look[2]-pos[2]];
+  const nz=Math.hypot(...z);z.forEach((v,i)=>z[i]=v/nz);
+  const up=[0,0,1];
+  let x=[z[1]*up[2]-z[2]*up[1],z[2]*up[0]-z[0]*up[2],z[0]*up[1]-z[1]*up[0]];
+  const nx=Math.hypot(...x)||1;x=x.map(v=>v/nx);
+  const y=[z[1]*x[2]-z[2]*x[1],z[2]*x[0]-z[0]*x[2],z[0]*x[1]-z[1]*x[0]];
+  return[[x[0],y[0],z[0],pos[0]],[x[1],y[1],z[1],pos[1]],[x[2],y[2],z[2],pos[2]],[0,0,0,1]];
+}
+function yamlFromList(list){
+  const f=T=>T.map(r=>'      - ['+r.map(v=>(+v).toFixed(4)).join(', ')+']').join('\n');
+  return'cameras:\n'+list.map((T,i)=>`  camera_${i+1}:\n    extrinsics_W_T_C:\n${f(T)}`).join('\n')+'\n';
+}
+function defaultYaml(){
+  const{C,L,ox,oy}=room;
+  return yamlFromList([
+    makeExtrinsics([-ox+.15,L-oy-.15,2.5],[0,0,.2]),
+    makeExtrinsics([C-ox-.15,-oy+.15,2.5],[0,0,.2])]);
+}
+function buildCams(yamlText){
+  if(camGroup)scene.remove(camGroup);
+  camGroup=new THREE.Group();cams=[];
+  const doc=jsyaml.load(yamlText);
+  if(doc?.robot_T_tag&&doc.robot_T_tag.length===4)ROBOT_T_TAG=doc.robot_T_tag;
+  const names=Object.keys(doc?.cameras||{}).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+  if(!names.length)throw new Error('nenhuma câmera em cameras:');
+  fovCfg.h=+document.getElementById('fovH').value||62;
+  fovCfg.v=+document.getElementById('fovV').value||48;
+  fovCfg.range=+document.getElementById('range').value||6.5;
+  const FH=THREE.MathUtils.degToRad(fovCfg.h),FV=THREE.MathUtils.degToRad(fovCfg.v),R=fovCfg.range;
+  names.forEach((name,i)=>{
+    const T=doc.cameras[name]?.extrinsics_W_T_C;
+    if(!T||T.length!==4)throw new Error(name+': extrinsics_W_T_C inválida');
+    const t=[T[0][3],T[1][3],T[2][3]],col=CAM_COLORS[i%CAM_COLORS.length];
+    const body=new THREE.Mesh(new THREE.BoxGeometry(.16,.1,.1),
+      new THREE.MeshStandardMaterial({color:col,roughness:.4}));
+    body.position.copy(W2T(t));
+    body.lookAt(W2T([t[0]+T[0][2],t[1]+T[1][2],t[2]+T[2][2]]));
+    camGroup.add(body);
+    const lab=textSprite(String(i+1),'#'+col.toString(16).padStart(6,'0'),.34);
+    lab.position.copy(W2T(t)).add(new THREE.Vector3(0,.22,0));camGroup.add(lab);
+    const toW=p=>[T[0][0]*p[0]+T[0][1]*p[1]+T[0][2]*p[2]+t[0],
+                  T[1][0]*p[0]+T[1][1]*p[1]+T[1][2]*p[2]+t[1],
+                  T[2][0]*p[0]+T[2][1]*p[1]+T[2][2]*p[2]+t[2]];
+    const corners=[];
+    for(const sx of[-1,1])for(const sy of[-1,1])
+      corners.push([Math.tan(FH/2)*sx*R,Math.tan(FV/2)*sy*R,R]);
+    const cw=corners.map(toW).map(W2T),o=W2T(t),idx=[0,1,3,2],lines=[],vts=[];
+    idx.forEach((ci,k)=>{lines.push(o,cw[ci]);lines.push(cw[ci],cw[idx[(k+1)%4]]);
+      vts.push(o,cw[ci],cw[idx[(k+1)%4]]);});
+    const frLines=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lines),
+      new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.5}));
+    const frFaces=new THREE.Mesh(new THREE.BufferGeometry().setFromPoints(vts),
+      new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.05,side:THREE.DoubleSide,depthWrite:false}));
+    camGroup.add(frLines,frFaces);
+    const ray=new THREE.Line(new THREE.BufferGeometry().setFromPoints([o.clone(),o.clone()]),
+      new THREE.LineBasicMaterial({color:0x4ADE80,transparent:true,opacity:.9}));
+    ray.visible=false;camGroup.add(ray);
+    const meas=new THREE.Mesh(new THREE.SphereGeometry(.045,10,10),
+      new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0}));
+    camGroup.add(meas);
+    const mring=new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(Array.from({length:33},()=>new THREE.Vector3())),
+      new THREE.LineBasicMaterial({color:col,transparent:true,opacity:0}));
+    camGroup.add(mring);
+    cams.push({name,T,Tinv:invRigid(T),t,origin:o,frLines,frFaces,ray,meas,mring,lastLive:0});
+  });
+  scene.add(camGroup);
+  document.getElementById('camCount').textContent='('+cams.length+')';
+  document.getElementById('badges').innerHTML=
+    cams.map((c,i)=>`<span class="badge" id="bad${i}">C${i+1}</span>`).join('');
+}
+function tagInFrustum(cam,p){
+  const T=cam.T,d=[p[0]-T[0][3],p[1]-T[1][3],p[2]-T[2][3]];
+  const px=T[0][0]*d[0]+T[1][0]*d[1]+T[2][0]*d[2];
+  const py=T[0][1]*d[0]+T[1][1]*d[1]+T[2][1]*d[2];
+  const pz=T[0][2]*d[0]+T[1][2]*d[1]+T[2][2]*d[2];
+  const FH=THREE.MathUtils.degToRad(fovCfg.h),FV=THREE.MathUtils.degToRad(fovCfg.v);
+  return pz>.05&&pz<fovCfg.range&&Math.abs(px/pz)<Math.tan(FH/2)&&Math.abs(py/pz)<Math.tan(FV/2);
+}
+function setCamActive(cam,i,det,seenPoint){
+  cam.frFaces.material.opacity=det?.13:.05;
+  cam.frLines.material.opacity=det?.95:.5;
+  const showF=document.getElementById('showFrustum').checked;
+  cam.ray.visible=det&&showF&&!!seenPoint;
+  if(cam.ray.visible){
+    const pos=cam.ray.geometry.attributes.position,tw=W2T(seenPoint);
+    pos.setXYZ(0,cam.origin.x,cam.origin.y,cam.origin.z);
+    pos.setXYZ(1,tw.x,tw.y,tw.z);pos.needsUpdate=true;
+  }
+  const b=document.getElementById('bad'+i);if(b)b.classList.toggle('on',det);
+}
+
+// ===== tags estáticas =====
+let staticTags=[],stGroup=null;
+function buildStaticTags(){
+  if(stGroup)scene.remove(stGroup);
+  stGroup=new THREE.Group();
+  staticTags.forEach(t=>{
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(.15,.15),
+      new THREE.MeshBasicMaterial({map:checkerTex(6)}));
+    m.rotation.x=-Math.PI/2;m.position.copy(W2T([t.x,t.y,.003]));
+    const lab=textSprite('#'+t.id,'#8B96A5',.26);
+    lab.position.copy(W2T([t.x,t.y,.22]));
+    stGroup.add(m,lab);
+  });
+  scene.add(stGroup);
+}
+function renderTagList(){
+  const el=document.getElementById('tagList');el.innerHTML='';
+  staticTags.forEach((t,i)=>{
+    const row=document.createElement('div');row.className='row';
+    row.innerHTML=`<label>id <input type="number" value="${t.id}" data-k="id" data-i="${i}" style="width:44px"></label>
+      x <input type="number" step="0.1" value="${t.x}" data-k="x" data-i="${i}">
+      y <input type="number" step="0.1" value="${t.y}" data-k="y" data-i="${i}">
+      <button class="danger" data-del="${i}" style="padding:2px 8px">×</button>`;
+    el.appendChild(row);
+  });
+  el.querySelectorAll('input').forEach(inp=>inp.addEventListener('change',e=>{
+    staticTags[+e.target.dataset.i][e.target.dataset.k]=+e.target.value;buildStaticTags();
+  }));
+  el.querySelectorAll('button[data-del]').forEach(b=>b.addEventListener('click',e=>{
+    staticTags.splice(+e.target.dataset.del,1);renderTagList();buildStaticTags();
+  }));
+}
+document.getElementById('addTag').addEventListener('click',()=>{
+  staticTags.push({id:staticTags.length+2,x:1,y:1});renderTagList();buildStaticTags();
+});
+
+// ===== alvos =====
+const TARGETS={A:[1.15,1.15],B:[.9,-.45],C:[-2.10,-1.15],D:[-1.6,1.22],E:[0,0]};
+let targetsGroup=null,targetMeshes={};
+function buildTargets(){
+  if(targetsGroup)scene.remove(targetsGroup);
+  targetsGroup=new THREE.Group();targetMeshes={};
+  for(const[g,p]of Object.entries(TARGETS)){
+    const disc=new THREE.Mesh(new THREE.CircleGeometry(.12,32),
+      new THREE.MeshBasicMaterial({color:0x2A3548}));
+    disc.rotation.x=-Math.PI/2;disc.position.copy(W2T([p[0],p[1],.004]));
+    const ring=new THREE.Mesh(new THREE.RingGeometry(.12,.15,32),
+      new THREE.MeshBasicMaterial({color:0x51617D,side:THREE.DoubleSide}));
+    ring.rotation.x=-Math.PI/2;ring.position.copy(W2T([p[0],p[1],.005]));
+    const lab=textSprite(g,'#8B96A5',.36);lab.position.copy(W2T([p[0],p[1],.28]));
+    targetsGroup.add(disc,ring,lab);
+    targetMeshes[g]={disc,ring};
+  }
+  scene.add(targetsGroup);
+}
+
+// ===== robôs =====
+function makeRobotMesh(color,ghost=false){
+  const g=new THREE.Group();
+  const mat=p=>ghost
+    ?new THREE.MeshBasicMaterial({color:0x5A6474,wireframe:true,transparent:true,opacity:.55})
+    :new THREE.MeshStandardMaterial(p);
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(.22,.24,.21,20),mat({color:0x8C1F1F,roughness:.55}));
+  base.position.y=.115;g.add(base);
+  const deck=new THREE.Mesh(new THREE.BoxGeometry(.3,.03,.34),mat({color:0x1B1F27,roughness:.7}));
+  deck.position.y=.235;g.add(deck);
+  if(!ghost){
+    const nose=new THREE.Mesh(new THREE.ConeGeometry(.05,.16,4),new THREE.MeshBasicMaterial({color}));
+    nose.rotation.x=Math.PI/2;nose.position.set(0,.26,.24);g.add(nose);
+    const rtag=new THREE.Mesh(new THREE.PlaneGeometry(.119,.119),
+      new THREE.MeshBasicMaterial({map:checkerTex(6)}));
+    rtag.rotation.x=-Math.PI/2;rtag.position.set(0,.253,-.165);g.add(rtag);
+  }
+  return g;
+}
+function makeTrail(color){
+  const geo=new THREE.BufferGeometry();
+  const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color,transparent:true,opacity:.85}));
+  scene.add(line);
+  return{geo,line,pts:[]};
+}
+function pushTrail(tr,x,y){
+  tr.pts.push(W2T([x,y,.02]));
+  if(tr.pts.length>2600)tr.pts.shift();
+  tr.geo.setFromPoints(tr.pts);
+}
+function tagWorldOf(x,y,psi){
+  const c=Math.cos(psi),s=Math.sin(psi);
+  return[x-.165*c,y-.165*s,.25];
+}
+
+// ===== simulação pura =====
+const ROBOT={a:.15},CTRL={Ka:2.5,K:1.06/5,thresh:.03};
+let simRobots=[];
+function setupSimRobots(n){
+  simRobots.forEach(r=>{scene.remove(r.mesh);scene.remove(r.trail.line);});
+  simRobots=[];
+  const baseQueue=['A','C','E','B','D'];
+  for(let i=0;i<n;i++){
+    const color=ROBOT_COLORS[i%ROBOT_COLORS.length];
+    const mesh=makeRobotMesh(color);scene.add(mesh);
+    const q=baseQueue.slice(i%5).concat(baseQueue.slice(0,i%5));
+    simRobots.push({x:.4*i-.2*(n-1),y:-.5-.35*i,psi:Math.PI/4,u:0,w:0,
+      queue:[...q],mesh,trail:makeTrail(color),color});
+  }
+  updateTargetsView();
+}
+function stepRobot(r,dt){
+  if(!r.queue.length){r.u=0;r.w=0;return;}
+  const tgt=TARGETS[r.queue[0]];
+  const cx=r.x+ROBOT.a*Math.cos(r.psi),cy=r.y+ROBOT.a*Math.sin(r.psi);
+  const ex=tgt[0]-cx,ey=tgt[1]-cy;
+  if(Math.hypot(ex,ey)<CTRL.thresh){r.queue.shift();updateTargetsView();return;}
+  const f1=Math.tanh(CTRL.Ka*ex)*CTRL.K,f2=Math.tanh(CTRL.Ka*ey)*CTRL.K;
+  const c=Math.cos(r.psi),s=Math.sin(r.psi);
+  r.u=Math.max(-.75,Math.min(.75,c*f1+s*f2));
+  r.w=Math.max(-1.75,Math.min(1.75,(-s*f1+c*f2)/ROBOT.a));
+  r.x+=r.u*Math.cos(r.psi)*dt;r.y+=r.u*Math.sin(r.psi)*dt;r.psi+=r.w*dt;
+}
+
+// ===== rastreador de taxa (Hz) por tópico =====
+const topicTimes={};
+function tickTopic(t){(topicTimes[t]=topicTimes[t]||[]).push(performance.now());
+  if(topicTimes[t].length>80)topicTimes[t].shift();}
+function hzOf(t){const a=topicTimes[t];if(!a||a.length<2)return 0;
+  const now=performance.now();const rec=a.filter(x=>now-x<2000);
+  if(rec.length<2)return 0;
+  return (rec.length-1)/(((rec[rec.length-1]-rec[0])/1000)||1);}
+function setCircle(line,cx,cy,r,z=.02){
+  const pos=line.geometry.attributes.position;
+  for(let i=0;i<33;i++){const th=i/32*2*Math.PI;
+    const v=W2T([cx+r*Math.cos(th),cy+r*Math.sin(th),z]);
+    pos.setXYZ(i,v.x,v.y,v.z);}
+  pos.needsUpdate=true;}
+
+// ===== conexão rosbridge (ao vivo + virtual) =====
+const conn={ws:null,ok:false};
+function wsSend(o){if(conn.ok)conn.ws.send(JSON.stringify(o));}
+function connectWS(onOpen,onMsg){
+  const url=document.getElementById('wsUrl').value.trim();
+  const st=document.getElementById('connStatus');
+  try{conn.ws=new WebSocket(url);}catch(e){st.textContent='URL inválida';st.className='status err';return;}
+  st.textContent='conectando a '+url+'…';st.className='status';
+  conn.ws.onopen=()=>{conn.ok=true;
+    st.textContent='conectado';st.className='status ok';
+    document.getElementById('connDot').classList.add('on');
+    onOpen&&onOpen();
+  };
+  conn.ws.onclose=()=>{conn.ok=false;
+    st.textContent='desconectado';st.className='status err';
+    document.getElementById('connDot').classList.remove('on');
+    if(mode==='virt'){document.getElementById('virtStatus').textContent='aguardando conexão';
+      document.getElementById('virtStatus').className='status';}
+  };
+  conn.ws.onerror=()=>{st.textContent='erro — rosbridge no ar? firewall? IP?';st.className='status err';};
+  conn.ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data);}catch{return;}
+    if(m.op==='publish')onMsg&&onMsg(m);};
+}
+document.getElementById('connectBtn').addEventListener('click',()=>{
+  if(conn.ok){conn.ws.close();return;}
+  if(mode==='live')connectWS(liveOnOpen,liveOnMsg);
+  else if(mode==='virt')connectWS(virtOnOpen,virtOnMsg);
+});
+
+// ===== AO VIVO =====
+const live={fused:null,odom:null,gt:null,gesture:'—',robotMesh:null,ghostMesh:null,
+  gtMesh:null,wdRing:null,trailF:null,trailO:null,trailG:null,cov:null,covLine:null,
+  lastFusedAt:0};
+function liveEnsure(){
+  if(!live.robotMesh){
+    live.robotMesh=makeRobotMesh(0x37C8D6);scene.add(live.robotMesh);
+    live.ghostMesh=makeRobotMesh(0,true);scene.add(live.ghostMesh);
+    live.gtMesh=makeRobotMesh(0,true);scene.add(live.gtMesh);
+    live.gtMesh.traverse(o=>{if(o.material)o.material.color=new THREE.Color(0xE8EDF2);});
+    live.trailF=makeTrail(0x37C8D6);live.trailO=makeTrail(0x5A6474);
+    live.trailG=makeTrail(0xE8EDF2);
+    const g=new THREE.BufferGeometry().setFromPoints(
+      Array.from({length:33},()=>new THREE.Vector3()));
+    live.covLine=new THREE.LineLoop(g,new THREE.LineBasicMaterial({color:0x37C8D6,transparent:true,opacity:.6}));
+    scene.add(live.covLine);live.covLine.visible=false;
+    live.wdRing=new THREE.Mesh(new THREE.RingGeometry(.3,.36,32),
+      new THREE.MeshBasicMaterial({color:0xE5A13D,transparent:true,opacity:.85,side:THREE.DoubleSide}));
+    live.wdRing.rotation.x=-Math.PI/2;live.wdRing.visible=false;scene.add(live.wdRing);
+    live.alvoMark=new THREE.Mesh(new THREE.RingGeometry(.10,.155,32),
+      new THREE.MeshBasicMaterial({color:0xF0564A,transparent:true,opacity:.9,side:THREE.DoubleSide}));
+    live.alvoMark.rotation.x=-Math.PI/2;live.alvoMark.visible=false;scene.add(live.alvoMark);
+  }
+  live.robotMesh.visible=live.ghostMesh.visible=true;
+  live.gtMesh.visible=false; // aparece quando chegar a 1ª mensagem do OptiTrack
+}
+function liveHide(){if(live.robotMesh){live.robotMesh.visible=live.ghostMesh.visible=false;
+  live.gtMesh.visible=false;live.wdRing.visible=false;
+  if(live.alvoMark)live.alvoMark.visible=false;
+  if(live.covLine)live.covLine.visible=false;}}
+function clearLiveTrails(){
+  [live.trailF,live.trailO,live.trailG].forEach(t=>{
+    if(t){t.pts=[];t.geo.setFromPoints([]);}});}
+function liveOnOpen(){
+  const sub=(topic,type)=>wsSend({op:'subscribe',topic,type,throttle_rate:50});
+  sub(document.getElementById('tRobot').value,'geometry_msgs/msg/PoseWithCovarianceStamped');
+  sub(document.getElementById('tOdom').value,'nav_msgs/msg/Odometry');
+  sub(document.getElementById('tGest').value,'std_msgs/msg/String');
+  sub(document.getElementById('tOpt').value,'geometry_msgs/msg/PoseStamped');
+  cams.forEach(c=>sub(`/apriltag/${c.name}/pose_world`,'geometry_msgs/msg/PoseStamped'));
+  clearLiveTrails();live.lastFusedAt=0;live.gt=null;
+  liveEnsure();
+}
+function liveOnMsg(m){
+  tickTopic(m.topic);
+  const tR=document.getElementById('tRobot').value,tO=document.getElementById('tOdom').value,
+        tG=document.getElementById('tGest').value,tOp=document.getElementById('tOpt').value;
+  if(m.topic===tR){
+    const p=m.msg.pose.pose;
+    live.fused={x:p.position.x,y:p.position.y,psi:quatYaw(p.orientation)};
+    live.cov=m.msg.pose.covariance;
+    live.lastFusedAt=performance.now();
+  }else if(m.topic===tOp){
+    const p=m.msg.pose;
+    live.gt={x:p.position.x,y:p.position.y,psi:quatYaw(p.orientation)};
+  }else if(m.topic===tO){
+    const p=m.msg.pose.pose;
+    live.odom={x:p.position.x,y:p.position.y,psi:quatYaw(p.orientation)};
+  }else if(m.topic===tG){
+    live.gesture=m.msg.data;
+    if(mode==='live')updateTargetsView(TARGETS[m.msg.data]?m.msg.data:undefined);
+  }else{
+    const c=cams.find(c=>m.topic===`/apriltag/${c.name}/pose_world`);
+    if(c){c.lastLive=performance.now();
+      const p=m.msg.pose.position;
+      c.meas.position.copy(W2T([p.x,p.y,.25]));
+      c.meas.material.opacity=.95;
+      // elipse (círculo 2σ) da incerteza desta medição — mesma fórmula do
+      // camera_measurement_noise() do kalman.py: σ = σ_base + k·d²
+      const dx=p.x-c.T[0][3],dy=p.y-c.T[1][3],dz=.25-c.T[2][3];
+      const d=Math.sqrt(dx*dx+dy*dy+dz*dz);
+      const sB=+document.getElementById('sigB').value||.02;
+      const sK=+document.getElementById('sigK').value||.01;
+      const r=2*(sB+sK*d*d);
+      setCircle(c.mring,p.x,p.y,r);
+      c.mring.material.opacity=.85;}
+  }
+}
+function updateCovEllipse(){
+  if(!live.cov||!live.fused||!document.getElementById('showCov').checked){
+    if(live.covLine)live.covLine.visible=false;return;}
+  const xx=live.cov[0],xy=live.cov[1],yy=live.cov[7];
+  const tr=xx+yy,det=xx*yy-xy*xy;
+  const l1=tr/2+Math.sqrt(Math.max(0,tr*tr/4-det)),l2=tr/2-Math.sqrt(Math.max(0,tr*tr/4-det));
+  const ang=Math.atan2(l1-xx,xy||1e-12);
+  const a=2*Math.sqrt(Math.max(l1,1e-8)),b=2*Math.sqrt(Math.max(l2,1e-8));
+  const pos=live.covLine.geometry.attributes.position;
+  for(let i=0;i<33;i++){
+    const th=i/32*2*Math.PI;
+    const ex=a*Math.cos(th),ey=b*Math.sin(th);
+    const wx=live.fused.x+ex*Math.cos(ang)-ey*Math.sin(ang);
+    const wy=live.fused.y+ex*Math.sin(ang)+ey*Math.cos(ang);
+    const v=W2T([wx,wy,.015]);pos.setXYZ(i,v.x,v.y,v.z);
+  }
+  pos.needsUpdate=true;live.covLine.visible=true;
+}
+
+// ===== ROBÔ VIRTUAL (SIL) =====
+const virt={truth:{x:0,y:0,psi:0},odom:{x:0,y:0,psi:0},
+  u:0,w:0,lastCmd:0,pubTimer:0,measTimer:0,
+  robotMesh:null,ghostMesh:null,trailT:null,trailO:null,gesture:'—'};
+function virtEnsure(){
+  if(!virt.robotMesh){
+    virt.robotMesh=makeRobotMesh(0x37C8D6);scene.add(virt.robotMesh);
+    virt.ghostMesh=makeRobotMesh(0,true);scene.add(virt.ghostMesh);
+    virt.trailT=makeTrail(0x37C8D6);virt.trailO=makeTrail(0x5A6474);
+  }
+  virt.robotMesh.visible=virt.ghostMesh.visible=true;
+}
+function virtHide(){if(virt.robotMesh){virt.robotMesh.visible=virt.ghostMesh.visible=false;}}
+function virtOnOpen(){
+  wsSend({op:'subscribe',topic:'/cmd_vel',type:'geometry_msgs/msg/Twist',throttle_rate:0});
+  wsSend({op:'subscribe',topic:document.getElementById('tGest').value,
+    type:'std_msgs/msg/String'});
+  wsSend({op:'advertise',topic:'/pose',type:'nav_msgs/msg/Odometry'});
+  cams.forEach(c=>wsSend({op:'advertise',
+    topic:`/apriltag/${c.name}/pose_raw`,type:'geometry_msgs/msg/PoseStamped'}));
+  document.getElementById('virtStatus').textContent=
+    'no ar — /cmd_vel assinado; publicando /pose e pose_raw';
+  document.getElementById('virtStatus').className='status ok';
+  virtEnsure();
+}
+function virtOnMsg(m){
+  if(m.topic==='/cmd_vel'){
+    virt.u=m.msg.linear.x;virt.w=m.msg.angular.z;virt.lastCmd=performance.now();
+  }else if(m.topic===document.getElementById('tGest').value){
+    virt.gesture=m.msg.data;
+    if(mode==='virt')updateTargetsView(TARGETS[m.msg.data]?m.msg.data:undefined);
+  }
+}
+function virtStep(dt){
+  // watchdog: sem /cmd_vel por 600 ms -> parar (como o robô real)
+  if(performance.now()-virt.lastCmd>600){virt.u=0;virt.w=0;}
+  virt.truth.x+=virt.u*Math.cos(virt.truth.psi)*dt;
+  virt.truth.y+=virt.u*Math.sin(virt.truth.psi)*dt;
+  virt.truth.psi+=virt.w*dt;
+  const slip=1-(+document.getElementById('slip').value||0)/100;
+  const on=(+document.getElementById('odomNoise').value||0)/1000;
+  const du=virt.u*slip*dt+gauss()*on,dw=virt.w*slip*dt+gauss()*on;
+  virt.odom.x+=du*Math.cos(virt.odom.psi);
+  virt.odom.y+=du*Math.sin(virt.odom.psi);
+  virt.odom.psi+=dw;
+  virt.pubTimer+=dt;
+  if(virt.pubTimer>=.05&&conn.ok){ // /pose a 20 Hz
+    virt.pubTimer=0;
+    wsSend({op:'publish',topic:'/pose',msg:{
+      header:{stamp:stampNow(),frame_id:'odom'},
+      child_frame_id:'base_link',
+      pose:{pose:{position:{x:virt.odom.x,y:virt.odom.y,z:0},
+        orientation:yawQuat(virt.odom.psi)},covariance:new Array(36).fill(0)},
+      twist:{twist:{linear:{x:virt.u,y:0,z:0},angular:{x:0,y:0,z:virt.w}},
+        covariance:new Array(36).fill(0)}}});
+  }
+  virt.measTimer+=dt;
+  if(virt.measTimer>=1/15&&conn.ok&&document.getElementById('pubMeas').checked){ // 15 Hz
+    virt.measTimer=0;
+    const pDet=(+document.getElementById('pDetect').value||85)/100;
+    const mn=(+document.getElementById('measNoise').value||0)/100;
+    const tagP=tagWorldOf(virt.truth.x,virt.truth.y,virt.truth.psi);
+    cams.forEach((cam,i)=>{
+      const visible=tagInFrustum(cam,tagP)&&Math.random()<pDet;
+      setCamActive(cam,i,visible,visible?tagP:null);
+      if(!visible)return;
+      const W_T_R=poseZ(virt.truth.x+gauss()*mn,virt.truth.y+gauss()*mn,
+                        virt.truth.psi+gauss()*mn*.5);
+      const C_T_tag=mul4(cam.Tinv,mul4(W_T_R,ROBOT_T_TAG));
+      wsSend({op:'publish',topic:`/apriltag/${cam.name}/pose_raw`,msg:{
+        header:{stamp:stampNow(),frame_id:cam.name},
+        pose:{position:{x:C_T_tag[0][3],y:C_T_tag[1][3],z:C_T_tag[2][3]},
+          orientation:mat3ToQuat(C_T_tag)}}});
+    });
+  }
+}
+document.getElementById('virtReset').addEventListener('click',()=>{
+  virt.truth={x:0,y:0,psi:0};virt.odom={x:0,y:0,psi:0};
+  if(virt.trailT){virt.trailT.pts=[];virt.trailT.geo.setFromPoints([]);
+    virt.trailO.pts=[];virt.trailO.geo.setFromPoints([]);}
+});
+
+// ===== REPLAY =====
+const replay={rows:[],dur:0,t:0,playing:false,idx:0};
+function parseTrajCSV(text){
+  const lines=text.trim().split(/\r?\n/);
+  if(lines.length<2)throw new Error('CSV vazio');
+  const sep=lines[0].includes(';')?';':',';
+  const H=lines[0].split(sep).map(s=>s.trim().toLowerCase());
+  const col=n=>H.indexOf(n);
+  const it=col('t');
+  if(it<0)throw new Error("coluna 't' ausente — use o CSV do main_controller v4");
+  const idx={t:it,xo:col('x_od'),yo:col('y_od'),po:col('psi_od'),
+    xf:col('x_fu'),yf:col('y_fu'),pf:col('psi_fu'),
+    xg:col('x_gt'),yg:col('y_gt'),pg:col('psi_gt'),
+    xa:col('x_alvo'),ya:col('y_alvo')};
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const c=lines[i].split(sep).map(Number);
+    if(!isFinite(c[idx.t]))continue;
+    rows.push({t:c[idx.t],
+      od:[c[idx.xo],c[idx.yo],c[idx.po]],
+      fu:[c[idx.xf],c[idx.yf],c[idx.pf]],
+      gt:[c[idx.xg],c[idx.yg],c[idx.pg]],
+      al:[c[idx.xa],c[idx.ya]]});
+  }
+  if(rows.length<2)throw new Error('nenhuma linha de dados válida');
+  rows.sort((a,b)=>a.t-b.t);
+  return rows;
+}
+function loadReplayTrails(){
+  clearLiveTrails();
+  const fin=v=>isFinite(v[0])&&isFinite(v[1]);
+  live.trailO.geo.setFromPoints(replay.rows.filter(r=>fin(r.od)).map(r=>W2T([r.od[0],r.od[1],.02])));
+  live.trailF.geo.setFromPoints(replay.rows.filter(r=>fin(r.fu)).map(r=>W2T([r.fu[0],r.fu[1],.02])));
+  live.trailG.geo.setFromPoints(replay.rows.filter(r=>fin(r.gt)).map(r=>W2T([r.gt[0],r.gt[1],.02])));
+}
+document.getElementById('replayFile').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const st=document.getElementById('replayStatus');
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      replay.rows=parseTrajCSV(rd.result);
+      replay.dur=replay.rows[replay.rows.length-1].t;
+      replay.t=0;replay.idx=0;replay.playing=false;
+      document.getElementById('replayPlay').textContent='Reproduzir';
+      document.getElementById('replaySlider').value=0;
+      liveEnsure();loadReplayTrails();
+      st.textContent=`${replay.rows.length} amostras · ${replay.dur.toFixed(1)} s`;
+      st.className='status ok';
+    }catch(err){st.textContent='erro: '+err.message;st.className='status err';}
+  };
+  rd.readAsText(f);
+});
+document.getElementById('replayPlay').addEventListener('click',e=>{
+  if(!replay.rows.length)return;
+  replay.playing=!replay.playing;
+  e.target.textContent=replay.playing?'Pausar':'Reproduzir';
+});
+document.getElementById('replaySlider').addEventListener('input',e=>{
+  if(!replay.rows.length)return;
+  replay.t=(+e.target.value/1000)*replay.dur;replay.idx=0;
+  replay.playing=false;
+  document.getElementById('replayPlay').textContent='Reproduzir';
+});
+function replayRowAt(t){
+  while(replay.idx<replay.rows.length-1&&replay.rows[replay.idx+1].t<=t)replay.idx++;
+  while(replay.idx>0&&replay.rows[replay.idx].t>t)replay.idx--;
+  return replay.rows[replay.idx];
+}
+
+// ===== UI =====
+let mode='sim';
+function setMode(m){
+  if(conn.ok)conn.ws.close(); // assinaturas mudam entre modos
+  mode=m;
+  ['modeSim','modeLive','modeVirt','modeReplay'].forEach(id=>
+    document.getElementById(id).classList.remove('active'));
+  document.getElementById(
+    m==='sim'?'modeSim':m==='live'?'modeLive':m==='virt'?'modeVirt':'modeReplay'
+  ).classList.add('active');
+  document.getElementById('connCfg').style.display=(m==='live'||m==='virt')?'block':'none';
+  document.getElementById('liveSec').style.display=m==='live'?'block':'none';
+  document.getElementById('virtSec').style.display=m==='virt'?'block':'none';
+  document.getElementById('replaySec').style.display=m==='replay'?'block':'none';
+  document.getElementById('simSec').style.display=m==='sim'?'block':'none';
+  document.getElementById('tv_mode').textContent=
+    m==='sim'?'SIM':m==='live'?'LIVE':m==='virt'?'SIL':'REPLAY';
+  document.getElementById('wdBanner').style.display='none';
+  document.querySelectorAll('.badge').forEach((b,i)=>b.textContent='C'+(i+1));
+  simRobots.forEach(r=>{r.mesh.visible=m==='sim';
+    r.trail.line.visible=m==='sim'&&document.getElementById('showTrail').checked;});
+  if(m==='live'){virtHide();liveEnsure();if(live.alvoMark)live.alvoMark.visible=false;}
+  else if(m==='virt'){liveHide();virtEnsure();}
+  else if(m==='replay'){virtHide();liveEnsure();
+    if(replay.rows.length)loadReplayTrails();}
+  else{liveHide();virtHide();}
+  updateTargetsView(); // limpa destaque herdado do modo anterior
+}
+document.getElementById('modeSim').addEventListener('click',()=>setMode('sim'));
+document.getElementById('modeLive').addEventListener('click',()=>setMode('live'));
+document.getElementById('modeVirt').addEventListener('click',()=>setMode('virt'));
+document.getElementById('modeReplay').addEventListener('click',()=>setMode('replay'));
+
+function updateTargetsView(extra){
+  const act=new Set(simRobots.map(r=>r.queue[0]).filter(Boolean));
+  if(extra)act.add(extra);
+  for(const[g,m]of Object.entries(targetMeshes)){
+    const on=act.has(g);
+    m.ring.material.color.set(on?0xF0564A:0x51617D);
+    m.disc.material.color.set(on?0x3A1720:0x2A3548);
+  }
+}
+function readRoom(){
+  room.C=+document.getElementById('dimC').value||8;
+  room.L=+document.getElementById('dimL').value||7;
+  room.A=+document.getElementById('dimA').value||3;
+  room.ox=Math.min(+document.getElementById('origX').value||4,room.C);
+  room.oy=Math.min(+document.getElementById('origY').value||3.5,room.L);
+  buildRoom();
+}
+['dimC','dimL','dimA','origX','origY'].forEach(id=>
+  document.getElementById(id).addEventListener('change',()=>{
+    readRoom();
+    if(document.getElementById('yamlStatus').textContent.includes('exemplo')){
+      document.getElementById('yamlBox').value=defaultYaml();
+      buildCams(document.getElementById('yamlBox').value);
+    }
+  }));
+['fovH','fovV','range'].forEach(id=>
+  document.getElementById(id).addEventListener('change',()=>{
+    try{buildCams(document.getElementById('yamlBox').value);}catch(e){}
+  }));
+const yStatus=document.getElementById('yamlStatus');
+document.getElementById('applyYaml').addEventListener('click',()=>{
+  try{buildCams(document.getElementById('yamlBox').value);
+    yStatus.textContent='yaml aplicado ('+cams.length+' câmeras)';yStatus.className='status ok';
+  }catch(e){yStatus.textContent='erro: '+e.message;yStatus.className='status err';}
+});
+document.getElementById('resetYaml').addEventListener('click',()=>{
+  document.getElementById('yamlBox').value=defaultYaml();
+  buildCams(document.getElementById('yamlBox').value);
+  yStatus.textContent='usando câmeras de exemplo';yStatus.className='status';
+});
+document.getElementById('addCam').addEventListener('click',()=>{
+  try{
+    const doc=jsyaml.load(document.getElementById('yamlBox').value)||{cameras:{}};
+    const n=Object.keys(doc.cameras||{}).length;
+    const{C,L,ox,oy}=room;
+    const walls=[[-ox+.15,(L-2*oy)/2,2.5],[C-ox-.15,(L-2*oy)/2,2.5],
+                 [(C-2*ox)/2,-oy+.15,2.5],[(C-2*ox)/2,L-oy-.15,2.5]];
+    doc.cameras=doc.cameras||{};
+    doc.cameras['camera_'+(n+1)]={extrinsics_W_T_C:makeExtrinsics(walls[n%4],[0,0,.2])};
+    const list=Object.keys(doc.cameras).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}))
+      .map(k=>doc.cameras[k].extrinsics_W_T_C);
+    document.getElementById('yamlBox').value=yamlFromList(list);
+    buildCams(document.getElementById('yamlBox').value);
+    yStatus.textContent=cams.length+' câmeras';yStatus.className='status';
+  }catch(e){yStatus.textContent='erro: '+e.message;yStatus.className='status err';}
+});
+document.getElementById('nRobots').addEventListener('change',e=>
+  setupSimRobots(Math.max(1,Math.min(6,+e.target.value||1))));
+let running=true;
+document.getElementById('playBtn').addEventListener('click',e=>{
+  running=!running;e.target.textContent=running?'Pausar':'Continuar';});
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  setupSimRobots(+document.getElementById('nRobots').value||1);
+  running=true;document.getElementById('playBtn').textContent='Pausar';simT=0;});
+document.getElementById('showFrustum').addEventListener('change',e=>
+  cams.forEach(c=>{c.frLines.visible=c.frFaces.visible=e.target.checked;}));
+document.getElementById('showTrail').addEventListener('change',e=>{
+  simRobots.forEach(r=>r.trail.line.visible=e.target.checked&&mode==='sim');
+  [live.trailF,live.trailO,virt.trailT,virt.trailO].forEach(t=>{
+    if(t)t.line.visible=e.target.checked;});
+});
+document.getElementById('showGhost').addEventListener('change',e=>{
+  if(live.ghostMesh)live.ghostMesh.visible=e.target.checked&&mode==='live';
+  if(virt.ghostMesh)virt.ghostMesh.visible=e.target.checked&&mode==='virt';
+});
+
+// ===== persistência de configuração (localStorage + link) =====
+function cfgObj(){
+  return{room:{...room},
+    yaml:document.getElementById('yamlBox').value,
+    tags:staticTags,
+    ws:document.getElementById('wsUrl').value,
+    topics:{r:document.getElementById('tRobot').value,
+            o:document.getElementById('tOdom').value,
+            g:document.getElementById('tGest').value,
+            opt:document.getElementById('tOpt').value}};
+}
+function saveCfg(){try{localStorage.setItem('nero_cfg',JSON.stringify(cfgObj()));}catch(e){}}
+function applyCfg(c){
+  if(!c)return false;
+  try{
+    if(c.room){room.C=c.room.C??8;room.L=c.room.L??7;room.A=c.room.A??3;
+      room.ox=c.room.ox??4;room.oy=c.room.oy??3.5;
+      document.getElementById('dimC').value=room.C;
+      document.getElementById('dimL').value=room.L;
+      document.getElementById('dimA').value=room.A;
+      document.getElementById('origX').value=room.ox;
+      document.getElementById('origY').value=room.oy;}
+    if(c.yaml)document.getElementById('yamlBox').value=c.yaml;
+    if(Array.isArray(c.tags))staticTags=c.tags;
+    if(c.ws)document.getElementById('wsUrl').value=c.ws;
+    if(c.topics){document.getElementById('tRobot').value=c.topics.r||'/robot_pose';
+      document.getElementById('tOdom').value=c.topics.o||'/pose';
+      document.getElementById('tGest').value=c.topics.g||'/Gesture';
+      document.getElementById('tOpt').value=c.topics.opt||'/optitrack_pose';}
+    return true;
+  }catch(e){return false;}
+}
+function loadCfg(){
+  let c=null;
+  if(location.hash.length>1){
+    try{c=JSON.parse(decodeURIComponent(atob(location.hash.slice(1))));}catch(e){}
+  }
+  if(!c){try{c=JSON.parse(localStorage.getItem('nero_cfg'));}catch(e){}}
+  return applyCfg(c);
+}
+document.getElementById('copyLink').addEventListener('click',()=>{
+  const st=document.getElementById('cfgStatus');
+  const link=location.href.split('#')[0]+'#'+
+    btoa(encodeURIComponent(JSON.stringify(cfgObj())));
+  const done=ok=>{st.textContent=ok?'link copiado — cole onde quiser':'copie da barra de endereço';
+    st.className=ok?'status ok':'status';
+    location.hash=link.split('#')[1];};
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(link).then(()=>done(true),()=>done(false));
+  else done(false);
+});
+document.getElementById('clearCfg').addEventListener('click',()=>{
+  try{localStorage.removeItem('nero_cfg');}catch(e){}
+  history.replaceState(null,'',location.pathname);
+  document.getElementById('cfgStatus').textContent='config apagada — recarregue p/ padrões';
+});
+// salvar automaticamente nas mudanças relevantes
+['dimC','dimL','dimA','origX','origY','wsUrl','tRobot','tOdom','tGest','tOpt']
+  .forEach(id=>document.getElementById(id).addEventListener('change',saveCfg));
+document.getElementById('applyYaml').addEventListener('click',saveCfg);
+document.getElementById('addCam').addEventListener('click',saveCfg);
+document.getElementById('addTag').addEventListener('click',saveCfg);
+
+// ===== init =====
+const hadCfg=loadCfg();
+buildRoom();
+if(!hadCfg||!document.getElementById('yamlBox').value.trim())
+  document.getElementById('yamlBox').value=defaultYaml();
+try{buildCams(document.getElementById('yamlBox').value);}
+catch(e){
+  document.getElementById('yamlBox').value=defaultYaml();
+  buildCams(document.getElementById('yamlBox').value);
+  yStatus.textContent='yaml salvo inválido — restaurado exemplo';yStatus.className='status err';
+}
+buildTargets();renderTagList();buildStaticTags();
+setupSimRobots(1);setMode('sim');
+if(hadCfg){document.getElementById('cfgStatus').textContent='config restaurada da última sessão';
+  document.getElementById('cfgStatus').className='status ok';}
+
+// ===== loop =====
+let last=performance.now(),simT=0,trailAcc=0,netAcc=0;
+function animate(now){
+  requestAnimationFrame(animate);
+  let dt=Math.min((now-last)/1000,.05);last=now;
+  let px=0,py=0,ppsi=0,hasPose=false;
+
+  if(mode==='sim'){
+    const spd=+document.getElementById('speed').value||1;
+    if(running){
+      for(const r of simRobots)for(let k=0;k<4;k++)stepRobot(r,dt*spd/4);
+      simT+=dt*spd;trailAcc+=dt;
+      if(trailAcc>.06){trailAcc=0;simRobots.forEach(r=>pushTrail(r.trail,r.x,r.y));}
+    }
+    simRobots.forEach(r=>{
+      r.mesh.position.copy(W2T([r.x,r.y,0]));
+      r.mesh.rotation.y=r.psi+Math.PI/2;});
+    const tagPts=simRobots.map(r=>tagWorldOf(r.x,r.y,r.psi));
+    cams.forEach((cam,i)=>{
+      let det=false,seen=null;
+      for(const p of tagPts)if(tagInFrustum(cam,p)){det=true;seen=p;break;}
+      setCamActive(cam,i,det,seen);});
+    const r0=simRobots[0];
+    px=r0.x;py=r0.y;ppsi=r0.psi;hasPose=true;
+    setTele(simT,r0.x,r0.y,r0.psi,r0.u,r0.w,r0.queue[0]??'—');
+  }
+  else if(mode==='virt'){
+    virtStep(dt);
+    virt.robotMesh.position.copy(W2T([virt.truth.x,virt.truth.y,0]));
+    virt.robotMesh.rotation.y=virt.truth.psi+Math.PI/2;
+    if(virt.ghostMesh.visible){
+      virt.ghostMesh.position.copy(W2T([virt.odom.x,virt.odom.y,0]));
+      virt.ghostMesh.rotation.y=virt.odom.psi+Math.PI/2;}
+    trailAcc+=dt;
+    if(trailAcc>.08){trailAcc=0;
+      pushTrail(virt.trailT,virt.truth.x,virt.truth.y);
+      pushTrail(virt.trailO,virt.odom.x,virt.odom.y);}
+    px=virt.truth.x;py=virt.truth.y;ppsi=virt.truth.psi;hasPose=true;
+    setTele((performance.now()%1e7)/1000,px,py,ppsi,virt.u,virt.w,virt.gesture);
+  }
+  else if(mode==='replay'){
+    if(replay.rows.length){
+      if(replay.playing){
+        replay.t+=dt*(+document.getElementById('replaySpeed').value||1);
+        if(replay.t>=replay.dur){replay.t=replay.dur;replay.playing=false;
+          document.getElementById('replayPlay').textContent='Reproduzir';}
+        document.getElementById('replaySlider').value=
+          Math.round(replay.t/replay.dur*1000);
+      }
+      const row=replayRowAt(replay.t);
+      const fu=isFinite(row.fu[0])?row.fu:row.od;
+      live.robotMesh.position.copy(W2T([fu[0],fu[1],0]));
+      live.robotMesh.rotation.y=fu[2]+Math.PI/2;
+      if(live.ghostMesh.visible&&isFinite(row.od[0])){
+        live.ghostMesh.position.copy(W2T([row.od[0],row.od[1],0]));
+        live.ghostMesh.rotation.y=row.od[2]+Math.PI/2;}
+      if(isFinite(row.gt[0])){live.gtMesh.visible=true;
+        live.gtMesh.position.copy(W2T([row.gt[0],row.gt[1],0]));
+        live.gtMesh.rotation.y=row.gt[2]+Math.PI/2;}
+      if(isFinite(row.al[0])){live.alvoMark.visible=true;
+        const va=W2T([row.al[0],row.al[1],.008]);
+        live.alvoMark.position.set(va.x,va.y,va.z);
+      }else live.alvoMark.visible=false;
+      px=fu[0];py=fu[1];ppsi=fu[2];hasPose=true;
+      setTele(replay.t,px,py,ppsi,NaN,NaN,
+        isFinite(row.al[0])?`(${row.al[0].toFixed(2)}, ${row.al[1].toFixed(2)})`:'—');
+    }
+  }
+  else{ // live
+    if(live.fused){
+      live.robotMesh.position.copy(W2T([live.fused.x,live.fused.y,0]));
+      live.robotMesh.rotation.y=live.fused.psi+Math.PI/2;
+      trailAcc+=dt;
+      if(trailAcc>.08){trailAcc=0;
+        pushTrail(live.trailF,live.fused.x,live.fused.y);
+        if(live.odom)pushTrail(live.trailO,live.odom.x,live.odom.y);
+        if(live.gt)pushTrail(live.trailG,live.gt.x,live.gt.y);}
+      px=live.fused.x;py=live.fused.y;ppsi=live.fused.psi;hasPose=true;
+      setTele((performance.now()%1e7)/1000,px,py,ppsi,NaN,NaN,live.gesture);
+      updateCovEllipse();
+    }
+    if(live.odom&&live.ghostMesh&&live.ghostMesh.visible){
+      live.ghostMesh.position.copy(W2T([live.odom.x,live.odom.y,0]));
+      live.ghostMesh.rotation.y=live.odom.psi+Math.PI/2;}
+    if(live.gt&&live.gtMesh){live.gtMesh.visible=true;
+      live.gtMesh.position.copy(W2T([live.gt.x,live.gt.y,0]));
+      live.gtMesh.rotation.y=live.gt.psi+Math.PI/2;}
+    // --- watchdog visual (espelha o do main_controller) ---
+    const wdT=+document.getElementById('poseTo').value||1;
+    const age=(performance.now()-live.lastFusedAt)/1000;
+    const stale=conn.ok&&live.lastFusedAt>0&&age>wdT;
+    const banner=document.getElementById('wdBanner');
+    banner.style.display=stale?'block':'none';
+    if(stale)banner.textContent='⚠ POSE OBSOLETA há '+age.toFixed(1)+' s';
+    if(live.wdRing){live.wdRing.visible=stale&&!!live.fused;
+      if(live.fused){const v=W2T([live.fused.x,live.fused.y,.012]);
+        live.wdRing.position.set(v.x,v.y,v.z);}}
+    // --- câmeras: destaque + fade + badge com Hz ---
+    const showEll=document.getElementById('showMeasEll').checked;
+    cams.forEach((c,i)=>{
+      const fresh=performance.now()-c.lastLive<400;
+      setCamActive(c,i,fresh,null);
+      if(c.meas.material.opacity>0)
+        c.meas.material.opacity=Math.max(0,c.meas.material.opacity-dt*1.8);
+      c.mring.material.opacity=showEll?c.meas.material.opacity*.9:0;
+      const b=document.getElementById('bad'+i);
+      if(b){const hz=hzOf(`/apriltag/${c.name}/pose_world`);
+        b.textContent=`C${i+1} ${hz?hz.toFixed(0)+'Hz':'–'}`;}
+    });
+    // --- diagnóstico de rede (2 Hz de atualização) ---
+    netAcc+=dt;
+    if(netAcc>.5){netAcc=0;
+      const tps=[document.getElementById('tRobot').value,
+        document.getElementById('tOdom').value,
+        document.getElementById('tGest').value,
+        document.getElementById('tOpt').value,
+        ...cams.map(c=>`/apriltag/${c.name}/pose_world`)];
+      document.getElementById('netDiag').innerHTML=conn.ok
+        ? tps.map(t=>{const h=hzOf(t);
+            return `<span style="color:${h>0?'var(--ok)':'var(--red)'}">●</span> ${t} <span style="float:right">${h.toFixed(1)} Hz</span>`;
+          }).join('<br>')
+        : '';
+    }
+  }
+
+  if(document.getElementById('followRobot').checked&&hasPose){
+    const tgt=W2T([px,py,0]);
+    orbit.target.lerp(new THREE.Vector3(tgt.x,.4,tgt.z),.06);
+    applyOrbit();
+  }
+  renderer.render(scene,camera3);
+}
+function setTele(t,x,y,psi,u,w,alvo){
+  document.getElementById('tv_t').textContent=t.toFixed(1)+' s';
+  document.getElementById('tv_x').textContent=x.toFixed(3);
+  document.getElementById('tv_y').textContent=y.toFixed(3);
+  document.getElementById('tv_psi').textContent=((psi*180/Math.PI)%360).toFixed(0)+'°';
+  document.getElementById('tv_uw').textContent=
+    isNaN(u)?'— / —':u.toFixed(2)+' / '+w.toFixed(2);
+  const tgt=TARGETS[alvo];
+  document.getElementById('tv_alvo').textContent = tgt
+    ? `${alvo} (${tgt[0].toFixed(2)}, ${tgt[1].toFixed(2)})`
+    : (alvo ?? '—');
+}
+requestAnimationFrame(animate);
+addEventListener('resize',()=>{
+  camera3.aspect=innerWidth/innerHeight;
+  camera3.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
