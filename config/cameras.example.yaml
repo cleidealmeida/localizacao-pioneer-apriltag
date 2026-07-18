@@ -1,0 +1,49 @@
+# cameras.example.yaml — CONFIGURAÇÃO CENTRAL DO SISTEMA (versão consolidada)
+# Copie para cameras.yaml (ignorado pelo git) e preencha na ordem:
+#   1. device de cada câmera        -> ls -l /dev/v4l/by-id/
+#   2. intrinsics                   -> preenchido por calib.py
+#   3. extrinsics_W_T_C             -> preenchido por reverse_localization.py
+#   4. tamanhos das tags            -> MEDIR COM RÉGUA (lado preto externo, m)
+#   5. robot_T_tag                  -> conferir com trena a montagem da tag no robô
+#
+# Este mesmo arquivo pode ser colado no visualizador web (campo Câmeras),
+# que também lê o robot_T_tag daqui.
+
+tag:
+  family: tag36h11
+  robot_tag_size: 0.119      # [m] <- MEDIR
+  robot_tag_id: 0
+  reference_tag_size: 0.196  # [m] <- MEDIR
+  reference_tag_id: 1
+
+# Pose da AprilTag no referencial do ROBÔ (o r_H_t do controlador MATLAB).
+# Valores herdados da montagem atual: -0.165 m em x, +0.145 m em z, invertida.
+robot_T_tag:
+  - [ 0.0, -1.0,  0.0, -0.165]
+  - [-1.0,  0.0,  0.0,  0.000]
+  - [ 0.0,  0.0, -1.0,  0.145]
+  - [ 0.0,  0.0,  0.0,  1.000]
+
+cameras:
+  camera_1:
+    device: /dev/v4l/by-id/CHANGE_ME-camera-1-video-index0
+    width: 640
+    height: 480
+    intrinsics:
+      fx: null
+      fy: null
+      cx: null
+      cy: null
+      dist: null
+    extrinsics_W_T_C: null
+  camera_2:
+    device: /dev/v4l/by-id/CHANGE_ME-camera-2-video-index0
+    width: 640
+    height: 480
+    intrinsics:
+      fx: null
+      fy: null
+      cx: null
+      cy: null
+      dist: null
+    extrinsics_W_T_C: null

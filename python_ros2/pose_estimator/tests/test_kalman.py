@@ -18,7 +18,12 @@ Critérios de aprovação:
 import numpy as np
 
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "pose_estimator"))
+# Funciona com tests/ dentro do pacote (python_ros2/pose_estimator/tests/) ou
+# como irmã dele: sobe diretórios até achar o pacote pose_estimator/.
+_here = os.path.dirname(os.path.abspath(__file__))
+for _cand in (os.path.join(_here, ".."), os.path.join(_here, "..", "..")):
+    if os.path.isdir(os.path.join(_cand, "pose_estimator")):
+        sys.path.insert(0, os.path.abspath(_cand)); break
 from pose_estimator.kalman import PlanarKalmanFilter, camera_measurement_noise
 from pose_estimator.transforms import wrap_angle
 
