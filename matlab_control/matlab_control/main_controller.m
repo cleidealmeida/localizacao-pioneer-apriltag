@@ -1,5 +1,5 @@
 %% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%   CONTROLADOR DO PIONEER 3-DX — v3
+%   CONTROLADOR DO PIONEER 3-DX — v4
 %
 %   Novidades da v3:
 %     - DUPLA VIA DE CONEXÃO com o robô, selecionável por chave:
@@ -13,6 +13,12 @@
 %       OptiTrack no fim (métrica central do artigo).
 %     - Mantém da v2: watchdog de /robot_pose, e-stop por joystick (botão B),
 %       correção do callback de /Gesture, cenários use_fused_pose.
+%
+%   Novidades da v4 (integração com o visualizador web):
+%     - Publica a pose do OptiTrack em /optitrack_pose (geometry_msgs/
+%       PoseStamped) para o visualizador desenhar o ground truth ao vivo.
+%     - Exporta a trajetória completa (odometria, fusão, GT, alvo) em CSV
+%       ao final do experimento, no formato lido pelo modo Replay do site.
 %
 %   Dependências no path: @Pioneer3DX (versão com rConnect/rGetSensorData —
 %   a do pacote "Pioneer 3DX"), @JoyControl (opcional), toolbox OptiTrack
@@ -85,6 +91,10 @@ switch robot_connection
     otherwise
         error('robot_connection deve ser ''rosaria'' ou ''aria''.');
 end
+
+% --- Publisher do ground truth (visualizador web) ---
+pub_opt = ros2publisher(node, '/optitrack_pose', 'geometry_msgs/PoseStamped');
+optMsg = ros2message(pub_opt);
 
 % --- CSV de métricas ---
 log_filename = 'resultados_experimentos.csv';
@@ -219,6 +229,15 @@ while toc(t) < tmax
                 % mesma convenção do getOptData do AuRoRA (mm->m; yaw = -eul(1))
                 gt_log(:, idx_log) = [rbi.Position(1)/1000; ...
                                       rbi.Position(2)/1000; -eul_gt(1)];
+                % Publica p/ o visualizador web (trajetória preta ao vivo)
+                optMsg.pose.position.x = gt_log(1, idx_log);
+                optMsg.pose.position.y = gt_log(2, idx_log);
+                qgt = eul2quat([gt_log(3, idx_log) 0 0]);   % [w x y z]
+                optMsg.pose.orientation.w = qgt(1);
+                optMsg.pose.orientation.x = qgt(2);
+                optMsg.pose.orientation.y = qgt(3);
+                optMsg.pose.orientation.z = qgt(4);
+                send(pub_opt, optMsg);
             end
         end
 
@@ -320,7 +339,7 @@ if strcmp(robot_connection, 'aria')
     try aria_shutdown; catch, end
 end
 rosshutdown;
-clear node sub_gesture sub_robot_pose sub_odom pub_cmd_vel pub_odom;
+clear node sub_gesture sub_robot_pose sub_odom pub_cmd_vel pub_odom pub_opt;
 
 n = idx_log - 1;
 tempo_log     = tempo_log(1:n);
@@ -330,6 +349,19 @@ controle_log  = controle_log(:, 1:n);
 alvo_log      = alvo_log(:, 1:n);
 gt_log        = gt_log(:, 1:n);
 timing_log    = timing_log(1:n);
+
+% --- Exporta trajetória p/ o modo Replay do visualizador web ---
+traj = [tempo_log; odometria_log; fusao_log; gt_log; alvo_log]';
+traj_file = ['trajetoria_' datestr(now,'yyyymmdd_HHMMSS') '.csv'];
+try
+    fid = fopen(traj_file, 'w');
+    fprintf(fid, 't,x_od,y_od,psi_od,x_fu,y_fu,psi_fu,x_gt,y_gt,psi_gt,x_alvo,y_alvo\n');
+    fclose(fid);
+    writematrix(traj, traj_file, 'WriteMode', 'append');
+    disp(['Trajetória exportada p/ replay: ' traj_file]);
+catch e
+    disp(['AVISO: exportação da trajetória falhou: ' e.message]);
+end
 
 if use_fused_pose
     scenario_suffix = '_Com Fusao Kalman';
