@@ -31,6 +31,7 @@ config/cameras.yaml
 
 # --- Logs e resultados de experimento ---
 resultados_experimentos.csv
+trajetoria_*.csv
 *.fig
 rosbag2_*/
 
