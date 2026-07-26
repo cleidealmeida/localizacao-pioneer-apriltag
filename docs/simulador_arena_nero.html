@@ -175,6 +175,12 @@
       <div class="row"><label id="posLabel">Câmera</label></div>
       <div class="row"><label for="posHeight">Altura [m]</label><input id="posHeight" type="number" step="0.05" min="0.1" max="10"></div>
     </div>
+    <div style="margin-top:9px;border-top:1px solid var(--line);padding-top:9px;">
+      <div class="mini" style="margin-bottom:6px;">Importar calibração pronta (.yaml/.yml/.json)</div>
+      <input type="file" id="importCalibFile" accept=".yaml,.yml,.json" style="width:100%;font-size:11px;color:var(--dim);">
+      <div id="importMap" style="display:none;margin-top:8px;"></div>
+      <div class="status" id="importStatus"></div>
+    </div>
   </div>
 
   <div class="sec">
@@ -1072,6 +1078,68 @@ document.getElementById('posHeight').addEventListener('change',e=>{
   document.getElementById('yamlBox').value=jsyaml.dump(camDoc,{noRefs:true,lineWidth:-1});
   buildCams(document.getElementById('yamlBox').value);
   saveCfg();
+});
+
+// ===== importar calibração pronta (.yaml/.yml/.json) =====
+let importSources=null; // [{name, intrinsics, device, width, height}]
+function extractCalibSources(parsed){
+  if(parsed&&typeof parsed==='object'&&parsed.cameras&&typeof parsed.cameras==='object'){
+    return Object.keys(parsed.cameras).map(name=>{
+      const c=parsed.cameras[name]||{};
+      return{name,intrinsics:c.intrinsics||null,device:c.device,width:c.width,height:c.height};
+    }).filter(s=>s.intrinsics&&s.intrinsics.fx);
+  }
+  if(parsed&&typeof parsed==='object'&&parsed.fx!=null){
+    return[{name:'arquivo',intrinsics:parsed,device:parsed.device,width:parsed.width,height:parsed.height}];
+  }
+  return[];
+}
+function renderImportMap(){
+  const el=document.getElementById('importMap');
+  if(!importSources||!importSources.length){el.style.display='none';return;}
+  const camNames=Object.keys(camDoc?.cameras||{});
+  el.style.display='block';
+  el.innerHTML=importSources.map((s,i)=>{
+    const opts=camNames.map(n=>`<option value="${n}"${n===s.name?' selected':''}>${n}</option>`).join('');
+    return`<div class="row"><label style="flex:1.3">${s.name} →</label>
+      <select data-i="${i}" style="flex:1;background:#0B0E14;color:var(--cyan);border:1px solid var(--line);border-radius:4px;">
+      <option value="">(ignorar)</option>${opts}</select></div>`;
+  }).join('')+'<div class="btnrow" style="margin-top:8px;"><button id="importApply" class="primary">Aplicar</button></div>';
+  document.getElementById('importApply').addEventListener('click',()=>{
+    const st=document.getElementById('importStatus');
+    let n=0;
+    el.querySelectorAll('select').forEach(sel=>{
+      const target=sel.value;if(!target)return;
+      const src=importSources[+sel.dataset.i];
+      camDoc.cameras[target]=camDoc.cameras[target]||{};
+      camDoc.cameras[target].intrinsics=src.intrinsics;
+      if(src.device)camDoc.cameras[target].device=src.device;
+      if(src.width)camDoc.cameras[target].width=src.width;
+      if(src.height)camDoc.cameras[target].height=src.height;
+      n++;
+    });
+    document.getElementById('yamlBox').value=jsyaml.dump(camDoc,{noRefs:true,lineWidth:-1});
+    buildCams(document.getElementById('yamlBox').value);
+    saveCfg();
+    st.textContent=n+' câmera(s) atualizada(s) com a calibração importada';st.className='status ok';
+    importSources=null;el.style.display='none';el.innerHTML='';
+    document.getElementById('importCalibFile').value='';
+  });
+}
+document.getElementById('importCalibFile').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const st=document.getElementById('importStatus');
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const parsed=jsyaml.load(rd.result);
+      importSources=extractCalibSources(parsed);
+      if(!importSources.length)throw new Error('nenhum bloco de intrinsics (fx/fy/cx/cy) encontrado no arquivo');
+      st.textContent=importSources.length+' câmera(s) no arquivo — escolha o destino:';st.className='status';
+      renderImportMap();
+    }catch(err){st.textContent='erro: '+err.message;st.className='status err';}
+  };
+  rd.readAsText(f);
 });
 document.getElementById('nRobots').addEventListener('change',e=>
   setupSimRobots(Math.max(1,Math.min(6,+e.target.value||1))));
