@@ -16,11 +16,9 @@ import glob
 import os
 
 import cv2
-import numpy as np
 import yaml
 
-PADRAO = (10, 7)  # cantos internos do tabuleiro (colunas, linhas)
-criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+from core import PATTERN_SIZE, calibrate_camera, find_chessboard_corners, make_object_points, reprojection_quality
 
 
 def main():
@@ -30,9 +28,7 @@ def main():
     ap.add_argument("--show", action="store_true", help="mostrar detecção de cada foto")
     args = ap.parse_args()
 
-    objp = np.zeros((PADRAO[0] * PADRAO[1], 3), np.float32)
-    objp[:, :2] = np.mgrid[0:PADRAO[0], 0:PADRAO[1]].T.reshape(-1, 2)
-
+    objp = make_object_points()
     objpoints, imgpoints = [], []
     images = sorted(glob.glob(os.path.join("imagens", args.camera, "*.jpg")))
     if not images:
@@ -43,48 +39,29 @@ def main():
     for fname in images:
         img = cv2.imread(fname)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        ret, corners = cv2.findChessboardCorners(gray, PADRAO, None)
-        if ret:
+        found, corners2 = find_chessboard_corners(gray)
+        if found:
             objpoints.append(objp)
-            corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
             imgpoints.append(corners2)
             if args.show:
-                cv2.drawChessboardCorners(img, PADRAO, corners2, ret)
+                cv2.drawChessboardCorners(img, PATTERN_SIZE, corners2, found)
                 cv2.imshow("Verificando", img)
                 cv2.waitKey(100)
     cv2.destroyAllWindows()
 
-    if not objpoints:
-        raise SystemExit("Tabuleiro não encontrado em nenhuma imagem.")
-
-    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
-        objpoints, imgpoints, gray.shape[::-1], None, None
-    )
-
-    # Erro de reprojeção — métrica de qualidade da calibração
-    total_err = 0.0
-    for i in range(len(objpoints)):
-        proj, _ = cv2.projectPoints(objpoints[i], rvecs[i], tvecs[i], mtx, dist)
-        total_err += cv2.norm(imgpoints[i], proj, cv2.NORM_L2) / len(proj)
-    reproj = total_err / len(objpoints)
+    result = calibrate_camera(objpoints, imgpoints, gray.shape[::-1])
+    reproj = result["reprojection_error_px"]
 
     print(f"\n✅ [{args.camera}] Calibração concluída "
           f"({len(objpoints)}/{len(images)} imagens usadas)")
-    print(f"Erro de reprojeção médio: {reproj:.3f} px "
-          f"({'BOM' if reproj < 0.5 else 'ACEITÁVEL' if reproj < 1.0 else 'RUIM — refazer fotos'})")
-    print("K =\n", mtx)
+    print(f"Erro de reprojeção médio: {reproj:.3f} px ({reprojection_quality(reproj)})")
+    print(f"fx={result['fx']:.2f} fy={result['fy']:.2f} "
+          f"cx={result['cx']:.2f} cy={result['cy']:.2f}")
 
     # Grava no cameras.yaml
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
-    cfg["cameras"][args.camera]["intrinsics"] = {
-        "fx": float(mtx[0, 0]),
-        "fy": float(mtx[1, 1]),
-        "cx": float(mtx[0, 2]),
-        "cy": float(mtx[1, 2]),
-        "dist": [float(d) for d in dist.ravel()],
-        "reprojection_error_px": float(reproj),
-    }
+    cfg["cameras"][args.camera]["intrinsics"] = result
     with open(args.config, "w") as f:
         yaml.safe_dump(cfg, f, sort_keys=False)
     print(f"Intrínsecos gravados em {args.config} -> cameras.{args.camera}.intrinsics")

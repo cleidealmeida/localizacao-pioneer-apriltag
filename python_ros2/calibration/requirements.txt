@@ -1,0 +1,8 @@
+opencv-python
+numpy
+pyyaml
+pupil-apriltags
+scipy
+fastapi
+uvicorn[standard]
+python-multipart
