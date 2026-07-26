@@ -165,6 +165,16 @@
     <div class="row"><label for="fovV">FOV vertical [°]</label><input id="fovV" type="number" min="15" max="100" value="48"></div>
     <div class="row"><label for="range">Alcance [m]</label><input id="range" type="number" min="1" max="20" step="0.5" value="6.5"></div>
     <div class="status" id="yamlStatus">usando câmeras de exemplo</div>
+    <div class="btnrow" style="margin-top:9px;">
+      <button id="posToggle">Posicionar câmeras</button>
+    </div>
+    <div class="mini" id="posHint" style="display:none;margin-top:6px;">
+      Arraste o corpo da câmera pra mover; arraste o anel no chão pra mirar.
+    </div>
+    <div id="posPanel" style="display:none;margin-top:8px;">
+      <div class="row"><label id="posLabel">Câmera</label></div>
+      <div class="row"><label for="posHeight">Altura [m]</label><input id="posHeight" type="number" step="0.05" min="0.1" max="10"></div>
+    </div>
   </div>
 
   <div class="sec">
@@ -296,9 +306,43 @@ function applyOrbit(){
 }
 applyOrbit();
 let drag=null;
-renderer.domElement.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,pan:e.shiftKey||e.button===2};});
-addEventListener('pointerup',()=>drag=null);
+renderer.domElement.addEventListener('pointerdown',e=>{
+  if(posMode&&camDoc){
+    posRaycaster.setFromCamera(pointerNDC(e),camera3);
+    let hit=posRaycaster.intersectObjects(cams.map(c=>c.body),false)[0];
+    if(hit){posDrag={cam:cams[cams.map(c=>c.body).indexOf(hit.object)],part:'body'};selectCam(posDrag.cam.name);return;}
+    hit=posRaycaster.intersectObjects(cams.map(c=>c.ring),false)[0];
+    if(hit){posDrag={cam:cams[cams.map(c=>c.ring).indexOf(hit.object)],part:'ring'};selectCam(posDrag.cam.name);return;}
+  }
+  drag={x:e.clientX,y:e.clientY,pan:e.shiftKey||e.button===2};
+});
+addEventListener('pointerup',()=>{
+  if(posDrag){posDrag=null;saveCfg();}
+  drag=null;
+});
 addEventListener('pointermove',e=>{
+  if(posDrag){
+    posRaycaster.setFromCamera(pointerNDC(e),camera3);
+    const name=posDrag.cam.name,curT=camDoc.cameras[name].extrinsics_W_T_C;
+    const pos=[curT[0][3],curT[1][3],curT[2][3]];
+    const plane=posDrag.part==='body'
+      ?new THREE.Plane(new THREE.Vector3(0,1,0),-pos[2])
+      :new THREE.Plane(new THREE.Vector3(0,1,0),0);
+    const ip=new THREE.Vector3();
+    if(posRaycaster.ray.intersectPlane(plane,ip)){
+      let newPos=pos,look;
+      if(posDrag.part==='body'){
+        newPos=[ip.x,-ip.z,pos[2]];
+        look=floorLookPoint(newPos,[curT[0][2],curT[1][2],curT[2][2]]);
+      }else{
+        look=[ip.x,-ip.z,0];
+      }
+      camDoc.cameras[name].extrinsics_W_T_C=makeExtrinsics(newPos,look);
+      document.getElementById('yamlBox').value=jsyaml.dump(camDoc,{noRefs:true,lineWidth:-1});
+      buildCams(document.getElementById('yamlBox').value);
+    }
+    return;
+  }
   if(!drag)return;
   const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
   if(drag.pan){
@@ -325,10 +369,22 @@ function textSprite(txt,color,size=.42){
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));
   sp.scale.set(size,size,1);return sp;
 }
-function checkerTex(n=8){
-  const c=document.createElement('canvas');c.width=c.height=n*8;
+function aprilTagTex(){
+  // Representação visual de uma AprilTag (família tag36h11): zona de
+  // quietude branca + borda preta sólida + grade de dados 6x6. O padrão
+  // interno é fixo (não corresponde a um ID real) — é só estética, a
+  // detecção de verdade é feita pelo apriltag_detector (Python).
+  const n=8,cell=40,c=document.createElement('canvas');c.width=c.height=n*cell;
   const g=c.getContext('2d');
-  for(let i=0;i<n;i++)for(let j=0;j<n;j++){g.fillStyle=(i+j)%2?'#0a0a0a':'#e8e8e8';g.fillRect(i*8,j*8,8,8);}
+  g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);
+  g.fillStyle='#000000';g.fillRect(cell,cell,c.width-2*cell,c.height-2*cell);
+  const bits=[
+    [1,0,1,1,0,0],[0,0,1,0,1,1],[1,1,0,1,0,1],
+    [0,1,1,0,0,1],[1,0,0,1,1,0],[0,1,0,0,1,1]];
+  for(let i=0;i<6;i++)for(let j=0;j<6;j++){
+    g.fillStyle=bits[i][j]?'#000000':'#ffffff';
+    g.fillRect(2*cell+j*cell,2*cell+i*cell,cell,cell);
+  }
   return new THREE.CanvasTexture(c);
 }
 
@@ -363,7 +419,7 @@ function buildRoom(){
   mk(C,A,W2T([(x0+x1)/2,y0,A/2]),0);mk(C,A,W2T([(x0+x1)/2,y1,A/2]),0);
   mk(L,A,W2T([x0,(y0+y1)/2,A/2]),Math.PI/2);mk(L,A,W2T([x1,(y0+y1)/2,A/2]),Math.PI/2);
   const tag=new THREE.Mesh(new THREE.PlaneGeometry(.196,.196),
-    new THREE.MeshBasicMaterial({map:checkerTex()}));
+    new THREE.MeshBasicMaterial({map:aprilTagTex()}));
   tag.rotation.x=-Math.PI/2;tag.position.y=.002;roomGroup.add(tag);
   const ax=(v,c)=>roomGroup.add(new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([W2T([0,0,.003]),W2T(v)]),
@@ -374,7 +430,21 @@ function buildRoom(){
 }
 
 // ===== câmeras =====
-let cams=[],camGroup=null;
+let cams=[],camGroup=null,camDoc=null,posMode=false,posDrag=null,selCam=null;
+const posRaycaster=new THREE.Raycaster(),posNdc=new THREE.Vector2();
+function pointerNDC(e){
+  const r=renderer.domElement.getBoundingClientRect();
+  posNdc.x=((e.clientX-r.left)/r.width)*2-1;
+  posNdc.y=-((e.clientY-r.top)/r.height)*2+1;
+  return posNdc;
+}
+function floorLookPoint(pos,fwd){
+  if(Math.abs(fwd[2])>1e-4){
+    const s=-pos[2]/fwd[2];
+    if(s>.1&&s<50)return[pos[0]+fwd[0]*s,pos[1]+fwd[1]*s,0];
+  }
+  return[pos[0]+fwd[0]*1.5,pos[1]+fwd[1]*1.5,Math.max(0,pos[2]-1.5)];
+}
 const fovCfg={h:62,v:48,range:6.5};
 function makeExtrinsics(pos,look){
   const z=[look[0]-pos[0],look[1]-pos[1],look[2]-pos[2]];
@@ -399,6 +469,7 @@ function buildCams(yamlText){
   if(camGroup)scene.remove(camGroup);
   camGroup=new THREE.Group();cams=[];
   const doc=jsyaml.load(yamlText);
+  camDoc=doc;
   if(doc?.robot_T_tag&&doc.robot_T_tag.length===4)ROBOT_T_TAG=doc.robot_T_tag;
   const names=Object.keys(doc?.cameras||{}).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
   if(!names.length)throw new Error('nenhuma câmera em cameras:');
@@ -417,6 +488,11 @@ function buildCams(yamlText){
     camGroup.add(body);
     const lab=textSprite(String(i+1),'#'+col.toString(16).padStart(6,'0'),.34);
     lab.position.copy(W2T(t)).add(new THREE.Vector3(0,.22,0));camGroup.add(lab);
+    const lookPt=floorLookPoint(t,[T[0][2],T[1][2],T[2][2]]);
+    const ring=new THREE.Mesh(new THREE.RingGeometry(.1,.14,24),
+      new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));
+    ring.rotation.x=-Math.PI/2;ring.position.copy(W2T(lookPt)).setY(.006);
+    ring.visible=posMode;camGroup.add(ring);
     const toW=p=>[T[0][0]*p[0]+T[0][1]*p[1]+T[0][2]*p[2]+t[0],
                   T[1][0]*p[0]+T[1][1]*p[1]+T[1][2]*p[2]+t[1],
                   T[2][0]*p[0]+T[2][1]*p[1]+T[2][2]*p[2]+t[2]];
@@ -441,12 +517,23 @@ function buildCams(yamlText){
       new THREE.BufferGeometry().setFromPoints(Array.from({length:33},()=>new THREE.Vector3())),
       new THREE.LineBasicMaterial({color:col,transparent:true,opacity:0}));
     camGroup.add(mring);
-    cams.push({name,T,Tinv:invRigid(T),t,origin:o,frLines,frFaces,ray,meas,mring,lastLive:0});
+    cams.push({name,T,Tinv:invRigid(T),t,origin:o,frLines,frFaces,ray,meas,mring,body,ring,lastLive:0});
   });
   scene.add(camGroup);
   document.getElementById('camCount').textContent='('+cams.length+')';
   document.getElementById('badges').innerHTML=
     cams.map((c,i)=>`<span class="badge" id="bad${i}">C${i+1}</span>`).join('');
+  if(selCam)selectCam(selCam);
+}
+function selectCam(name){
+  const c=cams.find(c=>c.name===name);
+  cams.forEach(cc=>cc.body.material.emissive&&cc.body.material.emissive.set(0x000000));
+  if(!c){selCam=null;document.getElementById('posPanel').style.display='none';return;}
+  selCam=name;
+  c.body.material.emissive&&c.body.material.emissive.set(0x333333);
+  document.getElementById('posPanel').style.display='block';
+  document.getElementById('posLabel').textContent='Câmera: '+name;
+  document.getElementById('posHeight').value=(+c.T[2][3]).toFixed(2);
 }
 function tagInFrustum(cam,p){
   const T=cam.T,d=[p[0]-T[0][3],p[1]-T[1][3],p[2]-T[2][3]];
@@ -476,7 +563,7 @@ function buildStaticTags(){
   stGroup=new THREE.Group();
   staticTags.forEach(t=>{
     const m=new THREE.Mesh(new THREE.PlaneGeometry(.15,.15),
-      new THREE.MeshBasicMaterial({map:checkerTex(6)}));
+      new THREE.MeshBasicMaterial({map:aprilTagTex()}));
     m.rotation.x=-Math.PI/2;m.position.copy(W2T([t.x,t.y,.003]));
     const lab=textSprite('#'+t.id,'#8B96A5',.26);
     lab.position.copy(W2T([t.x,t.y,.22]));
@@ -539,7 +626,7 @@ function makeRobotMesh(color,ghost=false){
     const nose=new THREE.Mesh(new THREE.ConeGeometry(.05,.16,4),new THREE.MeshBasicMaterial({color}));
     nose.rotation.x=Math.PI/2;nose.position.set(0,.26,.24);g.add(nose);
     const rtag=new THREE.Mesh(new THREE.PlaneGeometry(.119,.119),
-      new THREE.MeshBasicMaterial({map:checkerTex(6)}));
+      new THREE.MeshBasicMaterial({map:aprilTagTex()}));
     rtag.rotation.x=-Math.PI/2;rtag.position.set(0,.253,-.165);g.add(rtag);
   }
   return g;
@@ -964,12 +1051,27 @@ document.getElementById('addCam').addEventListener('click',()=>{
                  [(C-2*ox)/2,-oy+.15,2.5],[(C-2*ox)/2,L-oy-.15,2.5]];
     doc.cameras=doc.cameras||{};
     doc.cameras['camera_'+(n+1)]={extrinsics_W_T_C:makeExtrinsics(walls[n%4],[0,0,.2])};
-    const list=Object.keys(doc.cameras).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}))
-      .map(k=>doc.cameras[k].extrinsics_W_T_C);
-    document.getElementById('yamlBox').value=yamlFromList(list);
+    document.getElementById('yamlBox').value=jsyaml.dump(doc,{noRefs:true,lineWidth:-1});
     buildCams(document.getElementById('yamlBox').value);
     yStatus.textContent=cams.length+' câmeras';yStatus.className='status';
   }catch(e){yStatus.textContent='erro: '+e.message;yStatus.className='status err';}
+});
+document.getElementById('posToggle').addEventListener('click',e=>{
+  posMode=!posMode;
+  e.target.classList.toggle('primary',posMode);
+  document.getElementById('posHint').style.display=posMode?'block':'none';
+  cams.forEach(c=>c.ring.visible=posMode);
+  if(!posMode)selectCam(null);
+});
+document.getElementById('posHeight').addEventListener('change',e=>{
+  if(!selCam||!camDoc)return;
+  const T=camDoc.cameras[selCam].extrinsics_W_T_C;
+  const pos=[T[0][3],T[1][3],Math.max(.1,+e.target.value||T[2][3])];
+  const look=floorLookPoint(pos,[T[0][2],T[1][2],T[2][2]]);
+  camDoc.cameras[selCam].extrinsics_W_T_C=makeExtrinsics(pos,look);
+  document.getElementById('yamlBox').value=jsyaml.dump(camDoc,{noRefs:true,lineWidth:-1});
+  buildCams(document.getElementById('yamlBox').value);
+  saveCfg();
 });
 document.getElementById('nRobots').addEventListener('change',e=>
   setupSimRobots(Math.max(1,Math.min(6,+e.target.value||1))));
