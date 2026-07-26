@@ -5,7 +5,7 @@ multimodal por gestos e emoções (PIBIC 2023-2025), adicionando localização
 absoluta por visão computacional (2 câmeras + AprilTag + Filtro de Kalman),
 substituindo a odometria pura do Pioneer 3-DX.
 
-Orientadora: Kétia Soares Moreira · Bolsista: Cleide Almeida Coelho Fernandes
+
 
 ## Arquitetura
 
