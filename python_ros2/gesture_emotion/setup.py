@@ -10,7 +10,7 @@ def data_files_recursive(base):
     paths = []
     for root, _, files in os.walk(base):
         if files:
-            dest = os.path.join('lib/python3.10/site-packages', root)
+            dest = os.path.join('lib/python3.10/site-packages', package_name, root)
             paths.append((dest, [os.path.join(root, f) for f in files]))
     return paths
 
@@ -18,14 +18,20 @@ def data_files_recursive(base):
 setup(
     name=package_name,
     version='1.0.0',
-    packages=find_packages(exclude=['test']),
+    packages=[
+        package_name,
+        package_name + '.Emotion_GestureDetector',
+        package_name + '.Emotion_GestureDetector.utils',
+        package_name + '.Emotion_GestureDetector.models',
+    ],
+    package_dir={package_name: '.'},
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ]
-    + data_files_recursive(os.path.join(package_name, 'Emotion_GestureDetector', 'models'))
-    + data_files_recursive(os.path.join(package_name, 'Emotion_GestureDetector', 'Base_de_dados')),
+    + data_files_recursive(os.path.join('Emotion_GestureDetector', 'models'))
+    + data_files_recursive(os.path.join('Emotion_GestureDetector', 'Base_de_dados')),
     install_requires=['setuptools'],
     zip_safe=False,
     maintainer='Cleide Almeida Coelho Fernandes',

@@ -44,4 +44,5 @@ rosbag2_*/
 .DS_Store
 Thumbs.db
 .vscode/
+.claude/
 *.log
