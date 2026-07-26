@@ -1,6 +1,0 @@
-# Exemplo de formato — gerado automaticamente por reverse_localization.py
-# Copiar para camera_extrinsics.yaml (ignorado pelo git) após calibrar.
-camera_1:
-  W_T_C: [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]
-camera_2:
-  W_T_C: [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]
