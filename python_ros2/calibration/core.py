@@ -1,9 +1,10 @@
-# core.py — funções puras de calibração de câmera (tabuleiro de xadrez).
-# Extraídas de calib.py pra serem reaproveitadas também pelo server.py
-# (assistente de calibração ao vivo no navegador). Sem argparse, sem
-# leitura/escrita de arquivo — só a matemática do OpenCV.
+# core.py — funções puras de calibração de câmera (tabuleiro de xadrez) e de
+# detecção/pose de AprilTag. Extraídas de calib.py e reverse_localization.py
+# pra serem reaproveitadas também pelo server.py (assistente ao vivo no
+# navegador). Sem argparse, sem leitura/escrita de arquivo — só a matemática.
 import cv2
 import numpy as np
+from scipy.spatial.transform import Rotation as ScipyRotation
 
 PATTERN_SIZE = (10, 7)  # cantos internos do tabuleiro (colunas, linhas)
 CORNER_CRITERIA = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -65,3 +66,58 @@ def calibrate_camera(objpoints, imgpoints, image_size):
         "dist": [float(d) for d in dist.ravel()],
         "reprojection_error_px": float(reproj),
     }
+
+
+def detect_tag_pose(detector, gray_image, cam_params, tag_size, tag_id):
+    """Detecta a tag `tag_id` em gray_image e retorna a pose 4x4 C_T_tag
+    (câmera->tag), ou None se não detectada nesse frame. `detector` é uma
+    instância de pupil_apriltags.Detector (cabe ao chamador criar/reaproveitar
+    — não é thread-safe, então cada câmera precisa da sua própria instância,
+    igual já é feito em apriltag_detector_node.py)."""
+    results = detector.detect(
+        gray_image, estimate_tag_pose=True,
+        camera_params=cam_params, tag_size=tag_size,
+    )
+    for tag in results:
+        if tag.tag_id != tag_id:
+            continue
+        T = np.eye(4)
+        T[:3, :3] = tag.pose_R
+        T[:3, 3] = tag.pose_t.flatten()
+        return T
+    return None
+
+
+def average_poses(transforms_C_T_ref):
+    """Recebe uma lista de poses C_T_ref (câmera->tag de referência, 4x4) e
+    retorna (W_T_C, translation_std): a pose média da câmera no mundo
+    (assumindo a tag de referência como origem, W_T_C = inv(C_T_ref)) e o
+    desvio-padrão [x,y,z] da translação entre as amostras, em metros —
+    mesma lógica de reverse_localization.py (translação: média aritmética;
+    rotação: média de quatérnios alinhados por hemisfério)."""
+    if len(transforms_C_T_ref) < 3:
+        raise ValueError(
+            f"Só {len(transforms_C_T_ref)} detecções — mínimo de 3 pra estimar a pose."
+        )
+    translations, quats = [], []
+    for C_T_ref in transforms_C_T_ref:
+        W_T_C = np.linalg.inv(C_T_ref)
+        translations.append(W_T_C[:3, 3])
+        quats.append(ScipyRotation.from_matrix(W_T_C[:3, :3]).as_quat())
+
+    t_mean = np.mean(translations, axis=0)
+    Q = np.array(quats)
+    Q[Q[:, 3] < 0] *= -1.0
+    q_mean = Q.mean(axis=0)
+    q_mean /= np.linalg.norm(q_mean)
+
+    W_T_C = np.eye(4)
+    W_T_C[:3, :3] = ScipyRotation.from_quat(q_mean).as_matrix()
+    W_T_C[:3, 3] = t_mean
+
+    t_std = np.std(translations, axis=0)
+    return W_T_C, t_std
+
+
+def pose_stability_label(translation_std, threshold_m=0.01):
+    return "ESTÁVEL" if float(np.max(translation_std)) < threshold_m else "INSTÁVEL — repetir com melhor iluminação"

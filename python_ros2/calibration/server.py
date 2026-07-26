@@ -21,16 +21,22 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from pupil_apriltags import Detector as AprilTagDetector
 
 from core import (
     PATTERN_SIZE,
+    average_poses,
     calibrate_camera,
+    detect_tag_pose,
     find_chessboard_corners,
     make_object_points,
+    pose_stability_label,
     reprojection_quality,
 )
 
 HOST, PORT = "127.0.0.1", 8000
+TAG_N_FRAMES = 15   # mesmo valor de reverse_localization.py
+TAG_TIMEOUT_S = 30
 
 app = FastAPI(title="Assistente de calibração — servidor local")
 app.add_middleware(
@@ -62,6 +68,15 @@ class CameraSession:
         self.thread = threading.Thread(target=self._reader_loop, daemon=True)
         self.thread.start()
 
+        # estado da detecção de tag de origem (fase 4)
+        self._preview_detectors = {}   # family -> AprilTagDetector (só pra overlay do stream)
+        self.tag_running = False
+        self.tag_done = False
+        self.tag_detections = []
+        self.tag_result = None
+        self.tag_error = None
+        self.tag_start_time = None
+
     def _reader_loop(self):
         while self.running:
             ok, frame = self.cap.read()
@@ -75,8 +90,53 @@ class CameraSession:
         with self.lock:
             return None if self.latest_frame is None else self.latest_frame.copy()
 
+    def preview_detector(self, family):
+        if family not in self._preview_detectors:
+            self._preview_detectors[family] = AprilTagDetector(families=family)
+        return self._preview_detectors[family]
+
+    def start_tag_detection(self, tag_id, tag_size, family, cam_params):
+        self.tag_running = True
+        self.tag_done = False
+        self.tag_detections = []
+        self.tag_result = None
+        self.tag_error = None
+        self.tag_start_time = time.time()
+        detector = AprilTagDetector(families=family)
+        threading.Thread(
+            target=self._tag_loop, args=(detector, cam_params, tag_size, tag_id), daemon=True
+        ).start()
+
+    def _tag_loop(self, detector, cam_params, tag_size, tag_id):
+        while (
+            self.tag_running
+            and len(self.tag_detections) < TAG_N_FRAMES
+            and (time.time() - self.tag_start_time) < TAG_TIMEOUT_S
+        ):
+            frame = self.get_frame()
+            if frame is None:
+                time.sleep(0.03)
+                continue
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            T = detect_tag_pose(detector, gray, cam_params, tag_size, tag_id)
+            if T is not None:
+                self.tag_detections.append(T)
+            time.sleep(0.02)
+        self.tag_running = False
+        try:
+            W_T_C, t_std = average_poses(self.tag_detections)
+            self.tag_result = {
+                "W_T_C": [[float(v) for v in row] for row in W_T_C],
+                "translation_std_mm": [float(v) * 1000 for v in t_std],
+                "stability": pose_stability_label(t_std),
+            }
+        except ValueError as e:
+            self.tag_error = str(e)
+        self.tag_done = True
+
     def close(self):
         self.running = False
+        self.tag_running = False
         self.thread.join(timeout=1.0)
         self.cap.release()
 
@@ -134,7 +194,7 @@ def open_session(req: OpenSessionReq):
 
 
 @app.get("/api/sessions/{session_id}/stream")
-def stream(session_id: str, overlay: str = "chessboard"):
+def stream(session_id: str, overlay: str = "chessboard", tag_id: int = 0, family: str = "tag36h11"):
     session = _get_session(session_id)
 
     def gen():
@@ -149,6 +209,12 @@ def stream(session_id: str, overlay: str = "chessboard"):
                 found, corners = find_chessboard_corners(gray)
                 if found:
                     cv2.drawChessboardCorners(display, PATTERN_SIZE, corners, found)
+            elif overlay == "tag":
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                for tag in session.preview_detector(family).detect(gray):
+                    if tag.tag_id == tag_id:
+                        pts = tag.corners.astype(int).reshape(-1, 1, 2)
+                        cv2.polylines(display, [pts], True, (0, 255, 0), 2)
             ok, jpg = cv2.imencode(".jpg", display)
             if not ok:
                 continue
@@ -183,6 +249,41 @@ def calibrate(session_id: str):
     result["images_used"] = len(session.objpoints)
     result["quality"] = reprojection_quality(result["reprojection_error_px"])
     return result
+
+
+class TagDetectionReq(BaseModel):
+    tag_id: int
+    tag_size: float
+    family: str = "tag36h11"
+    fx: float
+    fy: float
+    cx: float
+    cy: float
+
+
+@app.post("/api/sessions/{session_id}/tag-detection")
+def start_tag_detection(session_id: str, req: TagDetectionReq):
+    session = _get_session(session_id)
+    cam_params = [req.fx, req.fy, req.cx, req.cy]
+    session.start_tag_detection(req.tag_id, req.tag_size, req.family, cam_params)
+    return {"started": True}
+
+
+@app.get("/api/sessions/{session_id}/tag-detection")
+def poll_tag_detection(session_id: str):
+    session = _get_session(session_id)
+    if session.tag_start_time is None:
+        raise HTTPException(400, "Detecção de tag ainda não foi iniciada nesta sessão.")
+    return {
+        "running": session.tag_running,
+        "samples": len(session.tag_detections),
+        "samples_needed": TAG_N_FRAMES,
+        "elapsed_s": round(time.time() - session.tag_start_time, 1),
+        "timeout_s": TAG_TIMEOUT_S,
+        "done": session.tag_done,
+        "result": session.tag_result,
+        "error": session.tag_error,
+    }
 
 
 @app.post("/api/sessions/{session_id}/close")

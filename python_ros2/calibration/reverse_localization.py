@@ -19,10 +19,10 @@ import argparse
 import time
 
 import cv2
-import numpy as np
 import yaml
 from pupil_apriltags import Detector
-from scipy.spatial.transform import Rotation as R
+
+from core import average_poses, detect_tag_pose, pose_stability_label
 
 N_FRAMES = 15          # detecções usadas na média
 TIMEOUT_S = 30         # tempo máximo tentando detectar
@@ -60,52 +60,31 @@ def main():
           f"(família {family}, lado {ref_size} m) na origem do mundo...")
     print(f"Coletando {N_FRAMES} detecções para a média. Não mova nada.")
 
-    translations, quats = [], []
+    detections = []
     t0 = time.time()
-    while len(translations) < N_FRAMES and (time.time() - t0) < TIMEOUT_S:
+    while len(detections) < N_FRAMES and (time.time() - t0) < TIMEOUT_S:
         ret, frame = cap.read()
         if not ret:
             continue
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        results = detector.detect(
-            gray, estimate_tag_pose=True,
-            camera_params=cam_params, tag_size=ref_size,
-        )
-        for tag in results:
-            if tag.tag_id != ref_id:
-                continue
-            C_T_A0 = np.eye(4)
-            C_T_A0[:3, :3] = tag.pose_R
-            C_T_A0[:3, 3] = tag.pose_t.flatten()
-            W_T_C = np.linalg.inv(C_T_A0)  # tag de referência == origem do mundo
-            translations.append(W_T_C[:3, 3])
-            quats.append(R.from_matrix(W_T_C[:3, :3]).as_quat())
-            print(f"  detecção {len(translations)}/{N_FRAMES}", end="\r")
+        C_T_A0 = detect_tag_pose(detector, gray, cam_params, ref_size, ref_id)
+        if C_T_A0 is not None:
+            detections.append(C_T_A0)
+            print(f"  detecção {len(detections)}/{N_FRAMES}", end="\r")
     cap.release()
 
-    if len(translations) < 3:
+    if len(detections) < 3:
         raise SystemExit(
-            f"\nSó {len(translations)} detecções em {TIMEOUT_S}s — verifique "
+            f"\nSó {len(detections)} detecções em {TIMEOUT_S}s — verifique "
             "iluminação, foco, distância e o id/tamanho da tag no cameras.yaml."
         )
 
-    # Média: translação aritmética; rotação via média de quatérnios
-    # (alinhando hemisfério e normalizando — adequado para orientações próximas)
-    t_mean = np.mean(translations, axis=0)
-    Q = np.array(quats)
-    Q[Q[:, 3] < 0] *= -1.0  # mesmo hemisfério
-    q_mean = np.mean(Q, axis=0)
-    q_mean /= np.linalg.norm(q_mean)
+    W_T_C, t_std = average_poses(detections)
 
-    W_T_C = np.eye(4)
-    W_T_C[:3, :3] = R.from_quat(q_mean).as_matrix()
-    W_T_C[:3, 3] = t_mean
-
-    t_std = np.std(translations, axis=0)
-    print(f"\n\n[{args.camera}] W_T_C estimada com {len(translations)} amostras")
-    print(f"Posição da câmera no mundo [x y z]: {np.round(t_mean, 4)} m")
-    print(f"Desvio-padrão da posição: {np.round(t_std * 1000, 1)} mm "
-          f"({'ESTÁVEL' if np.max(t_std) < 0.01 else 'INSTÁVEL — repetir com melhor iluminação'})")
+    print(f"\n\n[{args.camera}] W_T_C estimada com {len(detections)} amostras")
+    print(f"Posição da câmera no mundo [x y z]: {W_T_C[:3, 3].round(4)} m")
+    print(f"Desvio-padrão da posição: {(t_std * 1000).round(1)} mm "
+          f"({pose_stability_label(t_std)})")
 
     cfg["cameras"][args.camera]["extrinsics_W_T_C"] = [
         [float(v) for v in row] for row in W_T_C
