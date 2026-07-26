@@ -221,13 +221,13 @@
     <h2>Legenda</h2>
     <div class="legend">
       <!-- Cores fixas (não seguem o tema da UI): correspondem às cores reais
-           dos objetos na cena 3D, ainda não reskinada. -->
-      <div><span class="dot" style="background:#37C8D6"></span>Robô (verdade / fusão)</div>
-      <div><span class="dot" style="background:#5A6474"></span>Odometria (fantasma)</div>
-      <div><span class="dot" style="background:#E8EDF2"></span>OptiTrack (ground truth)</div>
+           dos objetos na cena 3D. -->
+      <div><span class="dot" style="background:#FF2C2C"></span>Robô (verdade / fusão)</div>
+      <div><span class="dot" style="background:#999999"></span>Odometria (fantasma)</div>
+      <div><span class="dot" style="background:#000000"></span>OptiTrack (ground truth)</div>
       <div><span class="dot" style="background:#E5A13D"></span>Câmeras (cores por índice)</div>
-      <div><span class="dot" style="background:#F0564A"></span>Alvo ativo</div>
-      <div><span class="dot" style="background:#4ADE80"></span>Detecção / medição</div>
+      <div><span class="dot" style="background:#A10000"></span>Alvo ativo</div>
+      <div><span class="dot" style="background:#000000"></span>Detecção / medição</div>
     </div>
   </div>
 </div>
@@ -251,7 +251,7 @@
    Câmeras OpenCV (z-forward). robot_T_tag idêntico ao cameras.yaml do projeto. */
 const W2T=v=>new THREE.Vector3(v[0],v[2],-v[1]);
 const CAM_COLORS=[0xE5A13D,0x9B7BFF,0xF472B6,0xA3E635,0x60A5FA,0xFB923C];
-const ROBOT_COLORS=[0x37C8D6,0xF0564A,0xA3E635,0xF472B6,0x60A5FA,0xE5A13D];
+const ROBOT_COLORS=[0xFF2C2C,0xF0564A,0xA3E635,0xF472B6,0x60A5FA,0xE5A13D];
 let ROBOT_T_TAG=[[0,-1,0,-0.165],[-1,0,0,0],[0,0,-1,0.145],[0,0,0,1]];
 
 // ===== álgebra 4x4 =====
@@ -293,8 +293,8 @@ function stampNow(){const ms=Date.now();return{sec:Math.floor(ms/1000),nanosec:(
 
 // ===== cena =====
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x0B0E14);
-scene.fog=new THREE.Fog(0x0B0E14,18,40);
+scene.background=new THREE.Color(0xFFFFFF);
+scene.fog=new THREE.Fog(0xFFFFFF,18,40);
 const renderer=new THREE.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setSize(innerWidth,innerHeight);
@@ -405,7 +405,7 @@ function buildRoom(){
   roomGroup=new THREE.Group();
   const{C,L,A,ox,oy}=room,x0=-ox,x1=C-ox,y0=-oy,y1=L-oy;
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(C,L),
-    new THREE.MeshStandardMaterial({color:0x0E1420,roughness:.95}));
+    new THREE.MeshStandardMaterial({color:0xF2F2F2,roughness:.95}));
   floor.rotation.x=-Math.PI/2;
   floor.position.copy(W2T([(x0+x1)/2,(y0+y1)/2,0]));floor.position.y=-.001;
   roomGroup.add(floor);
@@ -413,7 +413,7 @@ function buildRoom(){
   for(let x=Math.ceil(x0*2)/2;x<=x1+1e-6;x+=.5){gpts.push(W2T([x,y0,0]),W2T([x,y1,0]));}
   for(let y=Math.ceil(y0*2)/2;y<=y1+1e-6;y+=.5){gpts.push(W2T([x0,y,0]),W2T([x1,y,0]));}
   roomGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(gpts),
-    new THREE.LineBasicMaterial({color:0x1E2632})));
+    new THREE.LineBasicMaterial({color:0xD8D8D8})));
   const cor=[[x0,y0],[x1,y0],[x1,y1],[x0,y1]],wpts=[];
   for(let i=0;i<4;i++){
     const a=cor[i],b=cor[(i+1)%4];
@@ -422,8 +422,8 @@ function buildRoom(){
     wpts.push(W2T([a[0],a[1],0]),W2T([a[0],a[1],A]));
   }
   roomGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(wpts),
-    new THREE.LineBasicMaterial({color:0x33405A})));
-  const wmat=new THREE.MeshBasicMaterial({color:0x14202F,transparent:true,opacity:.14,side:THREE.DoubleSide,depthWrite:false});
+    new THREE.LineBasicMaterial({color:0xBBBBBB})));
+  const wmat=new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.06,side:THREE.DoubleSide,depthWrite:false});
   const mk=(w,h,pos,rotY)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),wmat);m.position.copy(pos);m.rotation.y=rotY;roomGroup.add(m);};
   mk(C,A,W2T([(x0+x1)/2,y0,A/2]),0);mk(C,A,W2T([(x0+x1)/2,y1,A/2]),0);
   mk(L,A,W2T([x0,(y0+y1)/2,A/2]),Math.PI/2);mk(L,A,W2T([x1,(y0+y1)/2,A/2]),Math.PI/2);
@@ -434,7 +434,7 @@ function buildRoom(){
     new THREE.BufferGeometry().setFromPoints([W2T([0,0,.003]),W2T(v)]),
     new THREE.LineBasicMaterial({color:c})));
   ax([.5,0,0],0xF0564A);ax([0,.5,0],0x4ADE80);ax([0,0,.5],0x5B8CFF);
-  const olab=textSprite('O','#8B96A5',.3);olab.position.set(.18,.1,.18);roomGroup.add(olab);
+  const olab=textSprite('O','#333333',.3);olab.position.set(.18,.1,.18);roomGroup.add(olab);
   scene.add(roomGroup);
 }
 
@@ -517,7 +517,7 @@ function buildCams(yamlText){
       new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.05,side:THREE.DoubleSide,depthWrite:false}));
     camGroup.add(frLines,frFaces);
     const ray=new THREE.Line(new THREE.BufferGeometry().setFromPoints([o.clone(),o.clone()]),
-      new THREE.LineBasicMaterial({color:0x4ADE80,transparent:true,opacity:.9}));
+      new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:.9}));
     ray.visible=false;camGroup.add(ray);
     const meas=new THREE.Mesh(new THREE.SphereGeometry(.045,10,10),
       new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0}));
@@ -574,7 +574,7 @@ function buildStaticTags(){
     const m=new THREE.Mesh(new THREE.PlaneGeometry(.15,.15),
       new THREE.MeshBasicMaterial({map:aprilTagTex()}));
     m.rotation.x=-Math.PI/2;m.position.copy(W2T([t.x,t.y,.003]));
-    const lab=textSprite('#'+t.id,'#8B96A5',.26);
+    const lab=textSprite('#'+t.id,'#333333',.26);
     lab.position.copy(W2T([t.x,t.y,.22]));
     stGroup.add(m,lab);
   });
@@ -609,12 +609,12 @@ function buildTargets(){
   targetsGroup=new THREE.Group();targetMeshes={};
   for(const[g,p]of Object.entries(TARGETS)){
     const disc=new THREE.Mesh(new THREE.CircleGeometry(.12,32),
-      new THREE.MeshBasicMaterial({color:0x2A3548}));
+      new THREE.MeshBasicMaterial({color:0xE0E0E0}));
     disc.rotation.x=-Math.PI/2;disc.position.copy(W2T([p[0],p[1],.004]));
     const ring=new THREE.Mesh(new THREE.RingGeometry(.12,.15,32),
-      new THREE.MeshBasicMaterial({color:0x51617D,side:THREE.DoubleSide}));
+      new THREE.MeshBasicMaterial({color:0xAAAAAA,side:THREE.DoubleSide}));
     ring.rotation.x=-Math.PI/2;ring.position.copy(W2T([p[0],p[1],.005]));
-    const lab=textSprite(g,'#8B96A5',.36);lab.position.copy(W2T([p[0],p[1],.28]));
+    const lab=textSprite(g,'#333333',.36);lab.position.copy(W2T([p[0],p[1],.28]));
     targetsGroup.add(disc,ring,lab);
     targetMeshes[g]={disc,ring};
   }
@@ -625,9 +625,9 @@ function buildTargets(){
 function makeRobotMesh(color,ghost=false){
   const g=new THREE.Group();
   const mat=p=>ghost
-    ?new THREE.MeshBasicMaterial({color:0x5A6474,wireframe:true,transparent:true,opacity:.55})
+    ?new THREE.MeshBasicMaterial({color:0x999999,wireframe:true,transparent:true,opacity:.55})
     :new THREE.MeshStandardMaterial(p);
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(.22,.24,.21,20),mat({color:0x8C1F1F,roughness:.55}));
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(.22,.24,.21,20),mat({color:0xA10000,roughness:.55}));
   base.position.y=.115;g.add(base);
   const deck=new THREE.Mesh(new THREE.BoxGeometry(.3,.03,.34),mat({color:0x1B1F27,roughness:.7}));
   deck.position.y=.235;g.add(deck);
@@ -735,21 +735,21 @@ const live={fused:null,odom:null,gt:null,gesture:'—',robotMesh:null,ghostMesh:
   lastFusedAt:0};
 function liveEnsure(){
   if(!live.robotMesh){
-    live.robotMesh=makeRobotMesh(0x37C8D6);scene.add(live.robotMesh);
+    live.robotMesh=makeRobotMesh(0xFF2C2C);scene.add(live.robotMesh);
     live.ghostMesh=makeRobotMesh(0,true);scene.add(live.ghostMesh);
     live.gtMesh=makeRobotMesh(0,true);scene.add(live.gtMesh);
-    live.gtMesh.traverse(o=>{if(o.material)o.material.color=new THREE.Color(0xE8EDF2);});
-    live.trailF=makeTrail(0x37C8D6);live.trailO=makeTrail(0x5A6474);
-    live.trailG=makeTrail(0xE8EDF2);
+    live.gtMesh.traverse(o=>{if(o.material)o.material.color=new THREE.Color(0x000000);});
+    live.trailF=makeTrail(0xFF2C2C);live.trailO=makeTrail(0x999999);
+    live.trailG=makeTrail(0x000000);
     const g=new THREE.BufferGeometry().setFromPoints(
       Array.from({length:33},()=>new THREE.Vector3()));
-    live.covLine=new THREE.LineLoop(g,new THREE.LineBasicMaterial({color:0x37C8D6,transparent:true,opacity:.6}));
+    live.covLine=new THREE.LineLoop(g,new THREE.LineBasicMaterial({color:0xFF2C2C,transparent:true,opacity:.6}));
     scene.add(live.covLine);live.covLine.visible=false;
     live.wdRing=new THREE.Mesh(new THREE.RingGeometry(.3,.36,32),
-      new THREE.MeshBasicMaterial({color:0xE5A13D,transparent:true,opacity:.85,side:THREE.DoubleSide}));
+      new THREE.MeshBasicMaterial({color:0xA10000,transparent:true,opacity:.85,side:THREE.DoubleSide}));
     live.wdRing.rotation.x=-Math.PI/2;live.wdRing.visible=false;scene.add(live.wdRing);
     live.alvoMark=new THREE.Mesh(new THREE.RingGeometry(.10,.155,32),
-      new THREE.MeshBasicMaterial({color:0xF0564A,transparent:true,opacity:.9,side:THREE.DoubleSide}));
+      new THREE.MeshBasicMaterial({color:0xA10000,transparent:true,opacity:.9,side:THREE.DoubleSide}));
     live.alvoMark.rotation.x=-Math.PI/2;live.alvoMark.visible=false;scene.add(live.alvoMark);
   }
   live.robotMesh.visible=live.ghostMesh.visible=true;
@@ -832,9 +832,9 @@ const virt={truth:{x:0,y:0,psi:0},odom:{x:0,y:0,psi:0},
   robotMesh:null,ghostMesh:null,trailT:null,trailO:null,gesture:'—'};
 function virtEnsure(){
   if(!virt.robotMesh){
-    virt.robotMesh=makeRobotMesh(0x37C8D6);scene.add(virt.robotMesh);
+    virt.robotMesh=makeRobotMesh(0xFF2C2C);scene.add(virt.robotMesh);
     virt.ghostMesh=makeRobotMesh(0,true);scene.add(virt.ghostMesh);
-    virt.trailT=makeTrail(0x37C8D6);virt.trailO=makeTrail(0x5A6474);
+    virt.trailT=makeTrail(0xFF2C2C);virt.trailO=makeTrail(0x999999);
   }
   virt.robotMesh.visible=virt.ghostMesh.visible=true;
 }
@@ -1016,8 +1016,8 @@ function updateTargetsView(extra){
   if(extra)act.add(extra);
   for(const[g,m]of Object.entries(targetMeshes)){
     const on=act.has(g);
-    m.ring.material.color.set(on?0xF0564A:0x51617D);
-    m.disc.material.color.set(on?0x3A1720:0x2A3548);
+    m.ring.material.color.set(on?0xA10000:0xAAAAAA);
+    m.disc.material.color.set(on?0xFCE8E8:0xE0E0E0);
   }
 }
 function readRoom(){
