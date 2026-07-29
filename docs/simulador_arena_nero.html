@@ -198,8 +198,13 @@
   </div>
 
   <div class="sec" id="simSec">
-    <h2>Robôs (simulação)</h2>
-    <div class="row"><label for="nRobots">Quantidade</label><input id="nRobots" type="number" min="1" max="6" value="1"></div>
+    <h2>Validação do Kalman (offline)</h2>
+    <div class="mini" style="margin:0 0 8px;">
+      Reproduz o cenário de <code>test_kalman.py</code>: robô em círculo,
+      odometria com deslizamento, câmeras (as configuradas abaixo) com
+      ruído dependente de distância e detecção intermitente, oclusão total
+      dos 30 aos 38s. RMSE ao vivo comparado com o do README.
+    </div>
     <div class="btnrow">
       <button id="playBtn" class="primary">Pausar</button>
       <button id="resetBtn">Reiniciar</button>
@@ -272,7 +277,8 @@ const THEMES={
     ghost:0x5A6474, robotBase:0x8C1F1F, robotDeck:0x1B1F27, robotAccent:0x37C8D6, gt:0xE8EDF2, wdRing:0xE5A13D, alvoMark:0xF0564A},
 };
 let theme='light';
-function T(){return THEMES[theme];}
+function THEME(){return THEMES[theme];} // nome longo de propósito: "T" já é usado em todo o
+// arquivo pra matrizes de transformação (const T=...), colidiria e quebraria em runtime.
 
 // ===== álgebra 4x4 =====
 function mul4(A,B){
@@ -401,8 +407,8 @@ class PlanarKalmanFilter{
 
 // ===== cena =====
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(T().bg);
-scene.fog=new THREE.Fog(T().bg,18,40);
+scene.background=new THREE.Color(THEME().bg);
+scene.fog=new THREE.Fog(THEME().bg,18,40);
 const renderer=new THREE.WebGLRenderer({antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setSize(innerWidth,innerHeight);
@@ -513,7 +519,7 @@ function buildRoom(){
   roomGroup=new THREE.Group();
   const{C,L,A,ox,oy}=room,x0=-ox,x1=C-ox,y0=-oy,y1=L-oy;
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(C,L),
-    new THREE.MeshStandardMaterial({color:T().floor,roughness:.95}));
+    new THREE.MeshStandardMaterial({color:THEME().floor,roughness:.95}));
   floor.rotation.x=-Math.PI/2;
   floor.position.copy(W2T([(x0+x1)/2,(y0+y1)/2,0]));floor.position.y=-.001;
   roomGroup.add(floor);
@@ -521,7 +527,7 @@ function buildRoom(){
   for(let x=Math.ceil(x0*2)/2;x<=x1+1e-6;x+=.5){gpts.push(W2T([x,y0,0]),W2T([x,y1,0]));}
   for(let y=Math.ceil(y0*2)/2;y<=y1+1e-6;y+=.5){gpts.push(W2T([x0,y,0]),W2T([x1,y,0]));}
   roomGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(gpts),
-    new THREE.LineBasicMaterial({color:T().grid})));
+    new THREE.LineBasicMaterial({color:THEME().grid})));
   const cor=[[x0,y0],[x1,y0],[x1,y1],[x0,y1]],wpts=[];
   for(let i=0;i<4;i++){
     const a=cor[i],b=cor[(i+1)%4];
@@ -530,8 +536,8 @@ function buildRoom(){
     wpts.push(W2T([a[0],a[1],0]),W2T([a[0],a[1],A]));
   }
   roomGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(wpts),
-    new THREE.LineBasicMaterial({color:T().wallLine})));
-  const wmat=new THREE.MeshBasicMaterial({color:T().wallFill,transparent:true,opacity:T().wallFillOpacity,side:THREE.DoubleSide,depthWrite:false});
+    new THREE.LineBasicMaterial({color:THEME().wallLine})));
+  const wmat=new THREE.MeshBasicMaterial({color:THEME().wallFill,transparent:true,opacity:THEME().wallFillOpacity,side:THREE.DoubleSide,depthWrite:false});
   const mk=(w,h,pos,rotY)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),wmat);m.position.copy(pos);m.rotation.y=rotY;roomGroup.add(m);};
   mk(C,A,W2T([(x0+x1)/2,y0,A/2]),0);mk(C,A,W2T([(x0+x1)/2,y1,A/2]),0);
   mk(L,A,W2T([x0,(y0+y1)/2,A/2]),Math.PI/2);mk(L,A,W2T([x1,(y0+y1)/2,A/2]),Math.PI/2);
@@ -542,7 +548,7 @@ function buildRoom(){
     new THREE.BufferGeometry().setFromPoints([W2T([0,0,.003]),W2T(v)]),
     new THREE.LineBasicMaterial({color:c})));
   ax([.5,0,0],0xF0564A);ax([0,.5,0],0x4ADE80);ax([0,0,.5],0x5B8CFF);
-  const olab=textSprite('O',T().label,.3);olab.position.set(.18,.1,.18);roomGroup.add(olab);
+  const olab=textSprite('O',THEME().label,.3);olab.position.set(.18,.1,.18);roomGroup.add(olab);
   scene.add(roomGroup);
 }
 
@@ -625,7 +631,7 @@ function buildCams(yamlText){
       new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.05,side:THREE.DoubleSide,depthWrite:false}));
     camGroup.add(frLines,frFaces);
     const ray=new THREE.Line(new THREE.BufferGeometry().setFromPoints([o.clone(),o.clone()]),
-      new THREE.LineBasicMaterial({color:T().ray,transparent:true,opacity:.9}));
+      new THREE.LineBasicMaterial({color:THEME().ray,transparent:true,opacity:.9}));
     ray.visible=false;camGroup.add(ray);
     const meas=new THREE.Mesh(new THREE.SphereGeometry(.045,10,10),
       new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0}));
@@ -682,7 +688,7 @@ function buildStaticTags(){
     const m=new THREE.Mesh(new THREE.PlaneGeometry(.15,.15),
       new THREE.MeshBasicMaterial({map:aprilTagTex()}));
     m.rotation.x=-Math.PI/2;m.position.copy(W2T([t.x,t.y,.003]));
-    const lab=textSprite('#'+t.id,T().label,.26);
+    const lab=textSprite('#'+t.id,THEME().label,.26);
     lab.position.copy(W2T([t.x,t.y,.22]));
     stGroup.add(m,lab);
   });
@@ -717,12 +723,12 @@ function buildTargets(){
   targetsGroup=new THREE.Group();targetMeshes={};
   for(const[g,p]of Object.entries(TARGETS)){
     const disc=new THREE.Mesh(new THREE.CircleGeometry(.12,32),
-      new THREE.MeshBasicMaterial({color:T().targetDisc}));
+      new THREE.MeshBasicMaterial({color:THEME().targetDisc}));
     disc.rotation.x=-Math.PI/2;disc.position.copy(W2T([p[0],p[1],.004]));
     const ring=new THREE.Mesh(new THREE.RingGeometry(.12,.15,32),
-      new THREE.MeshBasicMaterial({color:T().targetRing,side:THREE.DoubleSide}));
+      new THREE.MeshBasicMaterial({color:THEME().targetRing,side:THREE.DoubleSide}));
     ring.rotation.x=-Math.PI/2;ring.position.copy(W2T([p[0],p[1],.005]));
-    const lab=textSprite(g,T().label,.36);lab.position.copy(W2T([p[0],p[1],.28]));
+    const lab=textSprite(g,THEME().label,.36);lab.position.copy(W2T([p[0],p[1],.28]));
     targetsGroup.add(disc,ring,lab);
     targetMeshes[g]={disc,ring};
   }
@@ -733,11 +739,11 @@ function buildTargets(){
 function makeRobotMesh(color,ghost=false){
   const g=new THREE.Group();
   const mat=p=>ghost
-    ?new THREE.MeshBasicMaterial({color:T().ghost,wireframe:true,transparent:true,opacity:.55})
+    ?new THREE.MeshBasicMaterial({color:THEME().ghost,wireframe:true,transparent:true,opacity:.55})
     :new THREE.MeshStandardMaterial(p);
-  const base=new THREE.Mesh(new THREE.CylinderGeometry(.22,.24,.21,20),mat({color:T().robotBase,roughness:.55}));
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(.22,.24,.21,20),mat({color:THEME().robotBase,roughness:.55}));
   base.position.y=.115;g.add(base);
-  const deck=new THREE.Mesh(new THREE.BoxGeometry(.3,.03,.34),mat({color:T().robotDeck,roughness:.7}));
+  const deck=new THREE.Mesh(new THREE.BoxGeometry(.3,.03,.34),mat({color:THEME().robotDeck,roughness:.7}));
   deck.position.y=.235;g.add(deck);
   if(!ghost){
     const nose=new THREE.Mesh(new THREE.ConeGeometry(.05,.16,4),new THREE.MeshBasicMaterial({color}));
@@ -764,33 +770,95 @@ function tagWorldOf(x,y,psi){
   return[x-.165*c,y-.165*s,.25];
 }
 
-// ===== simulação pura =====
-const ROBOT={a:.15},CTRL={Ka:2.5,K:1.06/5,thresh:.03};
-let simRobots=[];
-function setupSimRobots(n){
-  simRobots.forEach(r=>{scene.remove(r.mesh);scene.remove(r.trail.line);});
-  simRobots=[];
-  const baseQueue=['A','C','E','B','D'];
-  for(let i=0;i<n;i++){
-    const color=ROBOT_COLORS[i%ROBOT_COLORS.length];
-    const mesh=makeRobotMesh(color);scene.add(mesh);
-    const q=baseQueue.slice(i%5).concat(baseQueue.slice(0,i%5));
-    simRobots.push({x:.4*i-.2*(n-1),y:-.5-.35*i,psi:Math.PI/4,u:0,w:0,
-      queue:[...q],mesh,trail:makeTrail(color),color});
+// ===== cenário de validação do Kalman (mesmo de test_kalman.py) =====
+// Odometria com deslizamento + 2 (ou mais) câmeras reais do YAML com ruído
+// dependente de distância + oclusão total num intervalo — mesma lógica do
+// script Python, mas com geometria 3D de verdade em vez de distância fixa.
+const BENCH={
+  DT:.05, V:.15, RADIUS:1.0,
+  SLIP:.98, ODOM_NOISE_XY:.001, ODOM_NOISE_TH:.002,
+  CAM_NOISE_XY:.02, CAM_NOISE_TH:.04,
+  P_DETECT:[.85,.75], // por índice de câmera; câmeras extras reusam o último valor
+  OCCLUSION:[30.0,38.0],
+  T_TOTAL:60.0,
+};
+let bench=null,benchAcc=0;
+function setupBench(){
+  if(bench){
+    [bench.mesh,bench.ghostMesh,bench.gtMesh].forEach(m=>scene.remove(m));
+    [bench.trailTrue,bench.trailOdom,bench.trailKF].forEach(t=>scene.remove(t.line));
   }
-  updateTargetsView();
+  bench={
+    W:BENCH.V/BENCH.RADIUS,
+    truePose:[BENCH.RADIUS,0,Math.PI/2],
+    odomPose:[BENCH.RADIUS,0,Math.PI/2],
+    kf:new PlanarKalmanFilter(),
+    simT:0,
+    mesh:makeRobotMesh(THEME().robotAccent),
+    ghostMesh:makeRobotMesh(0,true),
+    gtMesh:makeRobotMesh(0,true),
+    trailTrue:makeTrail(THEME().gt),
+    trailOdom:makeTrail(THEME().ghost),
+    trailKF:makeTrail(THEME().robotAccent),
+    errKF:[],errOdom:[],errCam:[],errKFOccl:[],
+    timeToRecover:null,
+    done:false,
+  };
+  bench.gtMesh.traverse(o=>{if(o.material)o.material.color=new THREE.Color(THEME().gt);});
+  bench.mesh.visible=false; // só aparece quando o KF inicializar (1ª detecção)
+  scene.add(bench.mesh,bench.ghostMesh,bench.gtMesh,
+    bench.trailTrue.line,bench.trailOdom.line,bench.trailKF.line);
+  benchAcc=0;
 }
-function stepRobot(r,dt){
-  if(!r.queue.length){r.u=0;r.w=0;return;}
-  const tgt=TARGETS[r.queue[0]];
-  const cx=r.x+ROBOT.a*Math.cos(r.psi),cy=r.y+ROBOT.a*Math.sin(r.psi);
-  const ex=tgt[0]-cx,ey=tgt[1]-cy;
-  if(Math.hypot(ex,ey)<CTRL.thresh){r.queue.shift();updateTargetsView();return;}
-  const f1=Math.tanh(CTRL.Ka*ex)*CTRL.K,f2=Math.tanh(CTRL.Ka*ey)*CTRL.K;
-  const c=Math.cos(r.psi),s=Math.sin(r.psi);
-  r.u=Math.max(-.75,Math.min(.75,c*f1+s*f2));
-  r.w=Math.max(-1.75,Math.min(1.75,(-s*f1+c*f2)/ROBOT.a));
-  r.x+=r.u*Math.cos(r.psi)*dt;r.y+=r.u*Math.sin(r.psi)*dt;r.psi+=r.w*dt;
+function stepBenchFixed(){
+  const{DT,V,RADIUS}=BENCH,W=bench.W,t=bench.simT;
+  let[tx,ty,tpsi]=bench.truePose;
+  const dTh=W*DT,dX=V*DT,ct=Math.cos(tpsi),st=Math.sin(tpsi);
+  tx+=ct*dX;ty+=st*dX;tpsi=wrapAngle(tpsi+dTh);
+  bench.truePose=[tx,ty,tpsi];
+
+  const dXod=dX*BENCH.SLIP+gauss()*BENCH.ODOM_NOISE_XY;
+  const dThOd=dTh*BENCH.SLIP+gauss()*BENCH.ODOM_NOISE_TH;
+  let[ox,oy,opsi]=bench.odomPose;
+  const co=Math.cos(opsi),so=Math.sin(opsi);
+  ox+=co*dXod;oy+=so*dXod;opsi=wrapAngle(opsi+dThOd);
+  bench.odomPose=[ox,oy,opsi];
+
+  bench.kf.predict(dXod,0,dThOd);
+
+  const occluded=t>=BENCH.OCCLUSION[0]&&t<=BENCH.OCCLUSION[1];
+  const tagP=tagWorldOf(tx,ty,tpsi);
+  cams.forEach((cam,i)=>{
+    const pDet=BENCH.P_DETECT[Math.min(i,BENCH.P_DETECT.length-1)];
+    const visible=!occluded&&tagInFrustum(cam,tagP)&&Math.random()<pDet;
+    let seen=null;
+    if(visible){
+      const d=Math.hypot(cam.t[0]-tagP[0],cam.t[1]-tagP[1],cam.t[2]-tagP[2]);
+      const z=[tx+gauss()*BENCH.CAM_NOISE_XY,ty+gauss()*BENCH.CAM_NOISE_XY,
+        wrapAngle(tpsi+gauss()*BENCH.CAM_NOISE_TH)];
+      const Rm=cameraMeasurementNoise(d);
+      const accepted=bench.kf.update(z,Rm);
+      if(accepted){bench.errCam.push(Math.hypot(z[0]-tx,z[1]-ty));seen=tagP;}
+      cam.meas.position.copy(W2T([z[0],z[1],tagP[2]]));
+      cam.meas.material.opacity=.95;
+      setCircle(cam.mring,z[0],z[1],2*(.02+.01*d*d));
+      cam.mring.material.opacity=.85;
+    }
+    setCamActive(cam,i,visible,seen);
+  });
+
+  if(bench.kf.initialized){
+    bench.mesh.visible=true;
+    const eKF=Math.hypot(bench.kf.x[0]-tx,bench.kf.x[1]-ty);
+    bench.errKF.push(eKF);
+    bench.errOdom.push(Math.hypot(ox-tx,oy-ty));
+    if(occluded)bench.errKFOccl.push(eKF);
+    if(t>BENCH.OCCLUSION[1]&&bench.timeToRecover===null&&eKF<.05){
+      bench.timeToRecover=t-BENCH.OCCLUSION[1];
+    }
+  }
+  bench.simT+=DT;
+  if(bench.simT>=BENCH.T_TOTAL)bench.done=true;
 }
 
 // ===== rastreador de taxa (Hz) por tópico =====
@@ -843,21 +911,21 @@ const live={fused:null,odom:null,gt:null,gesture:'—',robotMesh:null,ghostMesh:
   lastFusedAt:0};
 function liveEnsure(){
   if(!live.robotMesh){
-    live.robotMesh=makeRobotMesh(T().robotAccent);scene.add(live.robotMesh);
+    live.robotMesh=makeRobotMesh(THEME().robotAccent);scene.add(live.robotMesh);
     live.ghostMesh=makeRobotMesh(0,true);scene.add(live.ghostMesh);
     live.gtMesh=makeRobotMesh(0,true);scene.add(live.gtMesh);
-    live.gtMesh.traverse(o=>{if(o.material)o.material.color=new THREE.Color(T().gt);});
-    live.trailF=makeTrail(T().robotAccent);live.trailO=makeTrail(T().ghost);
-    live.trailG=makeTrail(T().gt);
+    live.gtMesh.traverse(o=>{if(o.material)o.material.color=new THREE.Color(THEME().gt);});
+    live.trailF=makeTrail(THEME().robotAccent);live.trailO=makeTrail(THEME().ghost);
+    live.trailG=makeTrail(THEME().gt);
     const g=new THREE.BufferGeometry().setFromPoints(
       Array.from({length:33},()=>new THREE.Vector3()));
-    live.covLine=new THREE.LineLoop(g,new THREE.LineBasicMaterial({color:T().robotAccent,transparent:true,opacity:.6}));
+    live.covLine=new THREE.LineLoop(g,new THREE.LineBasicMaterial({color:THEME().robotAccent,transparent:true,opacity:.6}));
     scene.add(live.covLine);live.covLine.visible=false;
     live.wdRing=new THREE.Mesh(new THREE.RingGeometry(.3,.36,32),
-      new THREE.MeshBasicMaterial({color:T().wdRing,transparent:true,opacity:.85,side:THREE.DoubleSide}));
+      new THREE.MeshBasicMaterial({color:THEME().wdRing,transparent:true,opacity:.85,side:THREE.DoubleSide}));
     live.wdRing.rotation.x=-Math.PI/2;live.wdRing.visible=false;scene.add(live.wdRing);
     live.alvoMark=new THREE.Mesh(new THREE.RingGeometry(.10,.155,32),
-      new THREE.MeshBasicMaterial({color:T().alvoMark,transparent:true,opacity:.9,side:THREE.DoubleSide}));
+      new THREE.MeshBasicMaterial({color:THEME().alvoMark,transparent:true,opacity:.9,side:THREE.DoubleSide}));
     live.alvoMark.rotation.x=-Math.PI/2;live.alvoMark.visible=false;scene.add(live.alvoMark);
   }
   live.robotMesh.visible=live.ghostMesh.visible=true;
@@ -940,9 +1008,9 @@ const virt={truth:{x:0,y:0,psi:0},odom:{x:0,y:0,psi:0},
   robotMesh:null,ghostMesh:null,trailT:null,trailO:null,gesture:'—'};
 function virtEnsure(){
   if(!virt.robotMesh){
-    virt.robotMesh=makeRobotMesh(T().robotAccent);scene.add(virt.robotMesh);
+    virt.robotMesh=makeRobotMesh(THEME().robotAccent);scene.add(virt.robotMesh);
     virt.ghostMesh=makeRobotMesh(0,true);scene.add(virt.ghostMesh);
-    virt.trailT=makeTrail(T().robotAccent);virt.trailO=makeTrail(T().ghost);
+    virt.trailT=makeTrail(THEME().robotAccent);virt.trailO=makeTrail(THEME().ghost);
   }
   virt.robotMesh.visible=virt.ghostMesh.visible=true;
 }
@@ -1105,8 +1173,15 @@ function setMode(m){
     m==='sim'?'SIM':m==='live'?'LIVE':m==='virt'?'SIL':'REPLAY';
   document.getElementById('wdBanner').style.display='none';
   document.querySelectorAll('.badge').forEach((b,i)=>b.textContent='C'+(i+1));
-  simRobots.forEach(r=>{r.mesh.visible=m==='sim';
-    r.trail.line.visible=m==='sim'&&document.getElementById('showTrail').checked;});
+  if(targetsGroup)targetsGroup.visible=m!=='sim'; // sem alvos de gesto no cenário de validação
+  if(bench){
+    const showT=document.getElementById('showTrail').checked;
+    const showG=document.getElementById('showGhost').checked;
+    bench.mesh.visible=(m==='sim')&&bench.kf.initialized;
+    bench.ghostMesh.visible=m==='sim'&&showG;
+    bench.gtMesh.visible=m==='sim';
+    bench.trailKF.line.visible=bench.trailOdom.line.visible=bench.trailTrue.line.visible=m==='sim'&&showT;
+  }
   if(m==='live'){virtHide();liveEnsure();if(live.alvoMark)live.alvoMark.visible=false;}
   else if(m==='virt'){liveHide();virtEnsure();}
   else if(m==='replay'){virtHide();liveEnsure();
@@ -1120,12 +1195,12 @@ document.getElementById('modeVirt').addEventListener('click',()=>setMode('virt')
 document.getElementById('modeReplay').addEventListener('click',()=>setMode('replay'));
 
 function updateTargetsView(extra){
-  const act=new Set(simRobots.map(r=>r.queue[0]).filter(Boolean));
+  const act=new Set(); // alvos de gesto: só relevantes em live/virt (sim usa o cenário de validação)
   if(extra)act.add(extra);
   for(const[g,m]of Object.entries(targetMeshes)){
     const on=act.has(g);
-    m.ring.material.color.set(on?T().targetRingOn:T().targetRing);
-    m.disc.material.color.set(on?T().targetDiscOn:T().targetDisc);
+    m.ring.material.color.set(on?THEME().targetRingOn:THEME().targetRing);
+    m.disc.material.color.set(on?THEME().targetDiscOn:THEME().targetDisc);
   }
 }
 function readRoom(){
@@ -1252,24 +1327,33 @@ document.getElementById('importCalibFile').addEventListener('change',e=>{
   };
   rd.readAsText(f);
 });
-document.getElementById('nRobots').addEventListener('change',e=>
-  setupSimRobots(Math.max(1,Math.min(6,+e.target.value||1))));
 let running=true;
 document.getElementById('playBtn').addEventListener('click',e=>{
   running=!running;e.target.textContent=running?'Pausar':'Continuar';});
 document.getElementById('resetBtn').addEventListener('click',()=>{
-  setupSimRobots(+document.getElementById('nRobots').value||1);
-  running=true;document.getElementById('playBtn').textContent='Pausar';simT=0;});
+  setupBench();
+  running=true;document.getElementById('playBtn').textContent='Pausar';
+  if(mode==='sim'){
+    bench.ghostMesh.visible=document.getElementById('showGhost').checked;
+    bench.gtMesh.visible=true;
+    const showT=document.getElementById('showTrail').checked;
+    bench.trailKF.line.visible=bench.trailOdom.line.visible=bench.trailTrue.line.visible=showT;
+  }
+});
 document.getElementById('showFrustum').addEventListener('change',e=>
   cams.forEach(c=>{c.frLines.visible=c.frFaces.visible=e.target.checked;}));
 document.getElementById('showTrail').addEventListener('change',e=>{
-  simRobots.forEach(r=>r.trail.line.visible=e.target.checked&&mode==='sim');
+  if(bench){
+    const v=e.target.checked&&mode==='sim';
+    bench.trailKF.line.visible=bench.trailOdom.line.visible=bench.trailTrue.line.visible=v;
+  }
   [live.trailF,live.trailO,virt.trailT,virt.trailO].forEach(t=>{
     if(t)t.line.visible=e.target.checked;});
 });
 document.getElementById('showGhost').addEventListener('change',e=>{
   if(live.ghostMesh)live.ghostMesh.visible=e.target.checked&&mode==='live';
   if(virt.ghostMesh)virt.ghostMesh.visible=e.target.checked&&mode==='virt';
+  if(bench)bench.ghostMesh.visible=e.target.checked&&mode==='sim';
 });
 
 // ===== persistência de configuração (localStorage + link) =====
@@ -1344,9 +1428,9 @@ function applyTheme(t,persist=true){
   document.documentElement.dataset.theme=t==='dark'?'dark':'';
   if(persist)try{localStorage.setItem('nero_theme',t);}catch(e){}
   setThemeButtonLabel();
-  scene.background=new THREE.Color(T().bg);
-  scene.fog=new THREE.Fog(T().bg,18,40);
-  ROBOT_COLORS[0]=T().robotAccent;
+  scene.background=new THREE.Color(THEME().bg);
+  scene.fog=new THREE.Fog(THEME().bg,18,40);
+  ROBOT_COLORS[0]=THEME().robotAccent;
   buildRoom();buildTargets();buildStaticTags();
   try{buildCams(document.getElementById('yamlBox').value);}catch(e){}
   const rebuildCtx=(ctx,ensureFn)=>{
@@ -1359,7 +1443,7 @@ function applyTheme(t,persist=true){
   };
   rebuildCtx(live,liveEnsure);
   rebuildCtx(virt,virtEnsure);
-  if(mode==='sim')setupSimRobots(+document.getElementById('nRobots').value||1);
+  if(bench)setupBench();
 }
 document.getElementById('themeToggle').addEventListener('click',()=>{
   applyTheme(theme==='light'?'dark':'light');
@@ -1371,7 +1455,7 @@ try{
 }catch(e){}
 document.documentElement.dataset.theme=theme==='dark'?'dark':'';
 setThemeButtonLabel();
-ROBOT_COLORS[0]=T().robotAccent;
+ROBOT_COLORS[0]=THEME().robotAccent;
 
 // ===== init =====
 const hadCfg=loadCfg();
@@ -1385,35 +1469,45 @@ catch(e){
   yStatus.textContent='yaml salvo inválido — restaurado exemplo';yStatus.className='status err';
 }
 buildTargets();renderTagList();buildStaticTags();
-setupSimRobots(1);setMode('sim');
+setupBench();setMode('sim');
 if(hadCfg){document.getElementById('cfgStatus').textContent='config restaurada da última sessão';
   document.getElementById('cfgStatus').className='status ok';}
 
 // ===== loop =====
-let last=performance.now(),simT=0,trailAcc=0,netAcc=0;
+let last=performance.now(),trailAcc=0,netAcc=0;
 function animate(now){
   requestAnimationFrame(animate);
   let dt=Math.min((now-last)/1000,.05);last=now;
   let px=0,py=0,ppsi=0,hasPose=false;
 
-  if(mode==='sim'){
+  if(mode==='sim'&&bench){
     const spd=+document.getElementById('speed').value||1;
-    if(running){
-      for(const r of simRobots)for(let k=0;k<4;k++)stepRobot(r,dt*spd/4);
-      simT+=dt*spd;trailAcc+=dt;
-      if(trailAcc>.06){trailAcc=0;simRobots.forEach(r=>pushTrail(r.trail,r.x,r.y));}
+    if(running&&!bench.done){
+      benchAcc+=dt*spd;
+      let guard=0;
+      while(benchAcc>=BENCH.DT&&!bench.done&&guard<200){
+        stepBenchFixed();benchAcc-=BENCH.DT;guard++;
+      }
+      trailAcc+=dt;
+      if(trailAcc>.06){trailAcc=0;
+        pushTrail(bench.trailTrue,bench.truePose[0],bench.truePose[1]);
+        pushTrail(bench.trailOdom,bench.odomPose[0],bench.odomPose[1]);
+        if(bench.kf.initialized)pushTrail(bench.trailKF,bench.kf.x[0],bench.kf.x[1]);
+      }
     }
-    simRobots.forEach(r=>{
-      r.mesh.position.copy(W2T([r.x,r.y,0]));
-      r.mesh.rotation.y=r.psi+Math.PI/2;});
-    const tagPts=simRobots.map(r=>tagWorldOf(r.x,r.y,r.psi));
-    cams.forEach((cam,i)=>{
-      let det=false,seen=null;
-      for(const p of tagPts)if(tagInFrustum(cam,p)){det=true;seen=p;break;}
-      setCamActive(cam,i,det,seen);});
-    const r0=simRobots[0];
-    px=r0.x;py=r0.y;ppsi=r0.psi;hasPose=true;
-    setTele(simT,r0.x,r0.y,r0.psi,r0.u,r0.w,r0.queue[0]??'—');
+    bench.ghostMesh.position.copy(W2T([bench.odomPose[0],bench.odomPose[1],0]));
+    bench.ghostMesh.rotation.y=bench.odomPose[2]+Math.PI/2;
+    bench.gtMesh.position.copy(W2T([bench.truePose[0],bench.truePose[1],0]));
+    bench.gtMesh.rotation.y=bench.truePose[2]+Math.PI/2;
+    if(bench.kf.initialized){
+      bench.mesh.visible=true;
+      bench.mesh.position.copy(W2T([bench.kf.x[0],bench.kf.x[1],0]));
+      bench.mesh.rotation.y=bench.kf.x[2]+Math.PI/2;
+    }
+    px=bench.truePose[0];py=bench.truePose[1];ppsi=bench.truePose[2];hasPose=true;
+    const occluded=bench.simT>=BENCH.OCCLUSION[0]&&bench.simT<=BENCH.OCCLUSION[1];
+    const status=bench.done?'concluído':occluded?'oclusão':'—';
+    setTele(bench.simT,bench.truePose[0],bench.truePose[1],bench.truePose[2],NaN,NaN,status);
   }
   else if(mode==='virt'){
     virtStep(dt);
