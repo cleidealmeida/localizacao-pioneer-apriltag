@@ -168,6 +168,7 @@
       <button id="applyYaml" class="primary">Aplicar</button>
       <button id="addCam">+ Câmera</button>
       <button id="resetYaml">Exemplo</button>
+      <button id="saveYamlFile">Salvar arquivo</button>
     </div>
     <div class="row" style="margin-top:9px;"><label for="fovH">FOV horizontal [°]</label><input id="fovH" type="number" min="20" max="120" value="62"></div>
     <div class="row"><label for="fovV">FOV vertical [°]</label><input id="fovV" type="number" min="15" max="100" value="48"></div>
@@ -1527,6 +1528,43 @@ buildTargets();renderTagList();buildStaticTags();
 setupBench();setMode('sim');
 if(hadCfg){document.getElementById('cfgStatus').textContent='config restaurada da última sessão';
   document.getElementById('cfgStatus').className='status ok';}
+
+// ===== recebe config ao vivo do assistente de calibração, quando aberto
+// dentro da casca docs/index.html (sem isso, cada página só se fala via
+// localStorage + reload) =====
+window.addEventListener('message',e=>{
+  if(!e.data||e.data.type!=='nero:configSaved'||!e.data.cfg)return;
+  if(applyCfg(e.data.cfg)){
+    saveCfg();
+    try{buildCams(document.getElementById('yamlBox').value);}catch(err){}
+    document.getElementById('cfgStatus').textContent='config recebida do assistente de calibração';
+    document.getElementById('cfgStatus').className='status ok';
+  }
+});
+
+// ===== salvar em arquivo de verdade (File System Access API, com fallback
+// de download clássico pra navegadores sem suporte) =====
+async function saveTextFile(text,suggestedName,statusEl){
+  if(window.showSaveFilePicker){
+    try{
+      const handle=await showSaveFilePicker({suggestedName,
+        types:[{description:'YAML',accept:{'text/yaml':['.yaml','.yml']}}]});
+      const w=await handle.createWritable();
+      await w.write(text);await w.close();
+      if(statusEl){statusEl.textContent='salvo em '+handle.name;statusEl.className='status ok';}
+      return;
+    }catch(e){if(e.name==='AbortError')return;}
+  }
+  const blob=new Blob([text],{type:'text/yaml'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=suggestedName;
+  a.click();URL.revokeObjectURL(a.href);
+  if(statusEl){statusEl.textContent='baixado como '+suggestedName;statusEl.className='status ok';}
+}
+document.getElementById('saveYamlFile').addEventListener('click',()=>{
+  saveTextFile(document.getElementById('yamlBox').value,'cameras.yaml',
+    document.getElementById('yamlStatus'));
+});
 
 // ===== loop =====
 let last=performance.now(),trailAcc=0,netAcc=0;

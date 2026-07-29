@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arena NERO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFFFFF; --panel:#FFFFFFF2; --line:rgba(0,0,0,.15); --txt:#000000; --dim:rgba(0,0,0,.6);
+    --cyan:#FF2C2C; --onaccent:#FFFFFF;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B0E14; --panel:#12161FE6; --line:#232B38; --txt:#E8EDF2; --dim:#8B96A5;
+    --cyan:#37C8D6; --onaccent:#06252A;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; overflow:hidden; background:var(--bg); color:var(--txt);
+    font-family:'Rajdhani',sans-serif;}
+  #topbar{position:fixed; top:0; left:0; right:0; height:52px; z-index:10;
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line);
+    backdrop-filter:blur(6px);}
+  #wordmark{font-size:15px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; flex:none;}
+  .seg{display:flex; border:1px solid var(--line); border-radius:5px; overflow:hidden;}
+  .seg button{flex:1; border:none; border-radius:0; background:transparent; padding:7px 16px;
+    font-family:'Rajdhani',sans-serif; font-weight:600; letter-spacing:.06em; font-size:13px;
+    color:var(--txt); cursor:pointer;}
+  .seg button.active{background:var(--cyan); color:var(--onaccent);}
+  .seg button:not(.active):hover{color:var(--cyan);}
+  #themeToggle{flex:none; font-family:'Rajdhani',sans-serif; font-weight:600; letter-spacing:.06em;
+    font-size:12px; background:transparent; color:var(--txt); border:1px solid var(--line);
+    border-radius:5px; padding:6px 10px; cursor:pointer;}
+  #themeToggle:hover{border-color:var(--cyan); color:var(--cyan);}
+  .view{position:absolute; top:52px; left:0; right:0; bottom:0; border:0; width:100%; height:calc(100% - 52px);}
+  .view.hidden{display:none;}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <div id="wordmark">Arena NERO</div>
+  <div class="seg">
+    <button id="tabCalib" class="active">Calibração</button>
+    <button id="tabSim">Simulador</button>
+  </div>
+  <button id="themeToggle">🌙 Modo escuro</button>
+</div>
+<iframe id="frameCalib" class="view" src="assistente_calibracao.html"></iframe>
+<iframe id="frameSim" class="view hidden" src="simulador_arena_nero.html"></iframe>
+
+<script>
+"use strict";
+// ===== tema — só a barra superior; cada iframe cuida do próprio tema
+// (mesma chave de localStorage, então já nascem consistentes) =====
+function applyTheme(t,persist=true){
+  document.documentElement.dataset.theme=t==='dark'?'dark':'';
+  if(persist)try{localStorage.setItem('nero_theme',t);}catch(e){}
+  document.getElementById('themeToggle').textContent=t==='dark'?'☀ Modo claro':'🌙 Modo escuro';
+}
+document.getElementById('themeToggle').addEventListener('click',()=>{
+  applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+});
+(()=>{
+  let theme='light';
+  try{
+    const saved=localStorage.getItem('nero_theme');
+    if(saved==='dark'||saved==='light')theme=saved;
+    else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)theme='dark';
+  }catch(e){}
+  applyTheme(theme,false);
+})();
+
+// ===== abas: alternar display, nunca recarregar (preserva estado dos 2) =====
+const frameCalib=document.getElementById('frameCalib');
+const frameSim=document.getElementById('frameSim');
+const tabCalib=document.getElementById('tabCalib');
+const tabSim=document.getElementById('tabSim');
+function showTab(name){
+  const sim=name==='sim';
+  frameSim.classList.toggle('hidden',!sim);
+  frameCalib.classList.toggle('hidden',sim);
+  tabSim.classList.toggle('active',sim);
+  tabCalib.classList.toggle('active',!sim);
+}
+tabCalib.addEventListener('click',()=>showTab('calib'));
+tabSim.addEventListener('click',()=>showTab('sim'));
+
+// ===== ponte entre os 2 iframes: a calibração termina e empurra o YAML
+// pro simulador ao vivo, sem passar por reload nenhum =====
+window.addEventListener('message',e=>{
+  if(e.source!==frameCalib.contentWindow)return;
+  if(e.data&&e.data.type==='nero:configSaved'){
+    frameSim.contentWindow.postMessage(e.data,'*');
+    showTab('sim');
+  }
+});
+</script>
+</body>
+</html>
