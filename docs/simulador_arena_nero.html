@@ -210,6 +210,7 @@
       <button id="resetBtn">Reiniciar</button>
     </div>
     <div class="row" style="margin-top:9px;"><label for="speed">Velocidade ×</label><input id="speed" type="number" step="0.5" min="0.5" max="10" value="2"></div>
+    <div class="row"><label for="showCovSim">Elipse de covariância</label><input id="showCovSim" type="checkbox" checked style="accent-color:var(--cyan);"></div>
     <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;">
       <div class="row"><label>RMSE odometria</label><span id="rOdom" style="color:var(--dim);">—</span></div>
       <div class="row"><label>RMSE câmera</label><span id="rCam" style="color:var(--dim);">—</span></div>
@@ -794,9 +795,11 @@ const BENCH={
 let bench=null,benchAcc=0;
 function setupBench(){
   if(bench){
-    [bench.mesh,bench.ghostMesh,bench.gtMesh].forEach(m=>scene.remove(m));
+    [bench.mesh,bench.ghostMesh,bench.gtMesh,bench.covLine].forEach(m=>scene.remove(m));
     [bench.trailTrue,bench.trailOdom,bench.trailKF].forEach(t=>scene.remove(t.line));
   }
+  const covGeo=new THREE.BufferGeometry().setFromPoints(
+    Array.from({length:33},()=>new THREE.Vector3()));
   bench={
     W:BENCH.V/BENCH.RADIUS,
     truePose:[BENCH.RADIUS,0,Math.PI/2],
@@ -806,6 +809,7 @@ function setupBench(){
     mesh:makeRobotMesh(THEME().robotAccent),
     ghostMesh:makeRobotMesh(0,true),
     gtMesh:makeRobotMesh(0,true),
+    covLine:new THREE.LineLoop(covGeo,new THREE.LineBasicMaterial({color:THEME().robotAccent,transparent:true,opacity:.6})),
     trailTrue:makeTrail(THEME().gt),
     trailOdom:makeTrail(THEME().ghost),
     trailKF:makeTrail(THEME().robotAccent),
@@ -815,10 +819,29 @@ function setupBench(){
   };
   bench.gtMesh.traverse(o=>{if(o.material)o.material.color=new THREE.Color(THEME().gt);});
   bench.mesh.visible=false; // só aparece quando o KF inicializar (1ª detecção)
-  scene.add(bench.mesh,bench.ghostMesh,bench.gtMesh,
+  bench.covLine.visible=false;
+  scene.add(bench.mesh,bench.ghostMesh,bench.gtMesh,bench.covLine,
     bench.trailTrue.line,bench.trailOdom.line,bench.trailKF.line);
   benchAcc=0;
   updateBenchResults();
+}
+function updateBenchCovEllipse(){
+  if(!bench.kf.initialized||!document.getElementById('showCovSim').checked){
+    bench.covLine.visible=false;return;}
+  const P=bench.kf.P,xx=P[0][0],xy=P[0][1],yy=P[1][1];
+  const tr=xx+yy,det=xx*yy-xy*xy;
+  const l1=tr/2+Math.sqrt(Math.max(0,tr*tr/4-det)),l2=tr/2-Math.sqrt(Math.max(0,tr*tr/4-det));
+  const ang=Math.atan2(l1-xx,xy||1e-12);
+  const a=2*Math.sqrt(Math.max(l1,1e-8)),b=2*Math.sqrt(Math.max(l2,1e-8));
+  const pos=bench.covLine.geometry.attributes.position;
+  for(let i=0;i<33;i++){
+    const th=i/32*2*Math.PI;
+    const ex=a*Math.cos(th),ey=b*Math.sin(th);
+    const wx=bench.kf.x[0]+ex*Math.cos(ang)-ey*Math.sin(ang);
+    const wy=bench.kf.x[1]+ex*Math.sin(ang)+ey*Math.cos(ang);
+    const v=W2T([wx,wy,.015]);pos.setXYZ(i,v.x,v.y,v.z);
+  }
+  pos.needsUpdate=true;bench.covLine.visible=true;
 }
 function benchRMSE(v){return v.length?Math.sqrt(v.reduce((s,x)=>s+x*x,0)/v.length):null;}
 function fmtCm(v){return v===null?'—':(v*100).toFixed(2)+' cm';}
@@ -1527,6 +1550,12 @@ function animate(now){
         pushTrail(bench.trailOdom,bench.odomPose[0],bench.odomPose[1]);
         if(bench.kf.initialized)pushTrail(bench.trailKF,bench.kf.x[0],bench.kf.x[1]);
       }
+      cams.forEach(c=>{ // apaga aos poucos a marca da última detecção (evita
+        if(c.meas.material.opacity>0){ // ficar "grudada" no ar durante a oclusão)
+          c.meas.material.opacity=Math.max(0,c.meas.material.opacity-dt*1.8);
+          c.mring.material.opacity=c.meas.material.opacity*.9;
+        }
+      });
     }
     bench.ghostMesh.position.copy(W2T([bench.odomPose[0],bench.odomPose[1],0]));
     bench.ghostMesh.rotation.y=bench.odomPose[2]+Math.PI/2;
@@ -1537,6 +1566,7 @@ function animate(now){
       bench.mesh.position.copy(W2T([bench.kf.x[0],bench.kf.x[1],0]));
       bench.mesh.rotation.y=bench.kf.x[2]+Math.PI/2;
     }
+    updateBenchCovEllipse();
     px=bench.truePose[0];py=bench.truePose[1];ppsi=bench.truePose[2];hasPose=true;
     const occluded=bench.simT>=BENCH.OCCLUSION[0]&&bench.simT<=BENCH.OCCLUSION[1];
     const status=bench.done?'concluído':occluded?'oclusão':'—';
