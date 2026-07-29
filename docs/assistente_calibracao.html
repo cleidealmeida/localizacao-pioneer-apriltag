@@ -10,8 +10,14 @@
   :root{
     --bg:#FFFFFF; --panel:#FFFFFFF2; --line:rgba(0,0,0,.15); --txt:#000000; --dim:rgba(0,0,0,.6);
     --cyan:#FF2C2C; --amber:#A10000; --ok:#000000; --red:#FF2C2C;
-    --fill:rgba(0,0,0,.04);
+    --fill:rgba(0,0,0,.04); --onaccent:#FFFFFF; --bannerbg:rgba(161,0,0,.08);
   }
+  :root[data-theme="dark"]{
+    --bg:#0B0E14; --panel:#12161FE6; --line:#232B38; --txt:#E8EDF2; --dim:#8B96A5;
+    --cyan:#37C8D6; --amber:#E5A13D; --ok:#4ADE80; --red:#F0564A;
+    --fill:#0B0E14; --onaccent:#06252A; --bannerbg:#3A2A08;
+  }
+  #themeToggle{position:fixed;right:16px;top:16px;padding:5px 10px;font-size:12px;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--bg);color:var(--txt);font-family:'Rajdhani',sans-serif;
     min-height:100vh;padding:24px;display:flex;justify-content:center;}
@@ -34,13 +40,13 @@
     background:var(--fill);color:var(--txt);border:1px solid var(--line);border-radius:5px;
     padding:7px 14px;cursor:pointer;}
   button:hover{border-color:var(--cyan);color:var(--cyan);}
-  button.primary{background:var(--cyan);color:#FFFFFF;border-color:var(--cyan);}
-  button.primary:hover{filter:brightness(1.1);color:#FFFFFF;}
+  button.primary{background:var(--cyan);color:var(--onaccent);border-color:var(--cyan);}
+  button.primary:hover{filter:brightness(1.1);color:var(--onaccent);}
   button:disabled{opacity:.4;cursor:not-allowed;}
   .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
   .status{font-size:12px;margin-top:8px;color:var(--dim);font-family:'IBM Plex Mono',monospace;}
   .status.ok{color:var(--ok);font-weight:600;} .status.err{color:var(--red);}
-  .banner{background:rgba(161,0,0,.08);border:1px solid var(--amber);color:var(--amber);
+  .banner{background:var(--bannerbg);border:1px solid var(--amber);color:var(--amber);
     font-size:12px;padding:8px 12px;border-radius:6px;margin-bottom:16px;display:none;}
   #preview{width:100%;max-width:480px;border-radius:6px;border:1px solid var(--line);
     background:#000;display:block;margin:10px 0;}
@@ -53,6 +59,7 @@
 </style>
 </head>
 <body>
+<button id="themeToggle">Modo escuro</button>
 <div class="wrap">
   <h1>Assistente de Calibração — Arena NERO</h1>
   <div class="sub">Câmeras → calibração ao vivo → (próximos passos: tag de origem, robot_T_tag) → <a class="link" href="simulador_arena_nero.html">Simulador</a></div>
@@ -167,6 +174,25 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 <script>
 "use strict";
+// ===== tema (claro/escuro) =====
+function applyTheme(t,persist=true){
+  document.documentElement.dataset.theme=t==='dark'?'dark':'';
+  if(persist)try{localStorage.setItem('nero_theme',t);}catch(e){}
+  document.getElementById('themeToggle').textContent=t==='dark'?'Modo claro':'Modo escuro';
+}
+document.getElementById('themeToggle').addEventListener('click',()=>{
+  applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+});
+(()=>{
+  let theme='light';
+  try{
+    const saved=localStorage.getItem('nero_theme');
+    if(saved==='dark'||saved==='light')theme=saved;
+    else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)theme='dark';
+  }catch(e){}
+  applyTheme(theme,false);
+})();
+
 if(location.protocol==='https:')document.getElementById('mixedContentBanner').style.display='block';
 
 const DEFAULT_YAML=`tag:
