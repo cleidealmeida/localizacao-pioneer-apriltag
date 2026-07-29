@@ -210,6 +210,15 @@
       <button id="resetBtn">Reiniciar</button>
     </div>
     <div class="row" style="margin-top:9px;"><label for="speed">Velocidade ×</label><input id="speed" type="number" step="0.5" min="0.5" max="10" value="2"></div>
+    <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;">
+      <div class="row"><label>RMSE odometria</label><span id="rOdom" style="color:var(--dim);">—</span></div>
+      <div class="row"><label>RMSE câmera</label><span id="rCam" style="color:var(--dim);">—</span></div>
+      <div class="row"><label>RMSE Kalman</label><span id="rKF" style="color:var(--cyan);font-weight:600;">—</span></div>
+      <div class="row"><label>Erro máx. oclusão</label><span id="rOccl" style="color:var(--dim);">—</span></div>
+      <div class="row"><label>Reconvergência</label><span id="rRecover" style="color:var(--dim);">—</span></div>
+      <div class="row"><label>Rejeitadas (gate)</label><span id="rRejected" style="color:var(--dim);">—</span></div>
+    </div>
+    <div class="status" id="benchStatus">aguardando 1ª detecção...</div>
   </div>
 
   <div class="sec">
@@ -809,6 +818,29 @@ function setupBench(){
   scene.add(bench.mesh,bench.ghostMesh,bench.gtMesh,
     bench.trailTrue.line,bench.trailOdom.line,bench.trailKF.line);
   benchAcc=0;
+  updateBenchResults();
+}
+function benchRMSE(v){return v.length?Math.sqrt(v.reduce((s,x)=>s+x*x,0)/v.length):null;}
+function fmtCm(v){return v===null?'—':(v*100).toFixed(2)+' cm';}
+function updateBenchResults(){
+  document.getElementById('rOdom').textContent=fmtCm(benchRMSE(bench.errOdom));
+  document.getElementById('rCam').textContent=fmtCm(benchRMSE(bench.errCam));
+  document.getElementById('rKF').textContent=fmtCm(benchRMSE(bench.errKF));
+  document.getElementById('rOccl').textContent=
+    bench.errKFOccl.length?fmtCm(Math.max(...bench.errKFOccl)):'—';
+  document.getElementById('rRecover').textContent=
+    bench.timeToRecover!==null?bench.timeToRecover.toFixed(2)+' s'
+    :(bench.simT>BENCH.OCCLUSION[1]?'ainda não':'—');
+  document.getElementById('rRejected').textContent=bench.kf.nRejected;
+  const st=document.getElementById('benchStatus');
+  if(bench.done){
+    st.textContent='concluído — cenário completo (60s simulados)';st.className='status ok';
+  }else if(!bench.kf.initialized){
+    st.textContent='aguardando 1ª detecção...';st.className='status';
+  }else{
+    const occluded=bench.simT>=BENCH.OCCLUSION[0]&&bench.simT<=BENCH.OCCLUSION[1];
+    st.textContent=occluded?'em oclusão total…':'rodando…';st.className='status';
+  }
 }
 function stepBenchFixed(){
   const{DT,V,RADIUS}=BENCH,W=bench.W,t=bench.simT;
@@ -1488,6 +1520,7 @@ function animate(now){
       while(benchAcc>=BENCH.DT&&!bench.done&&guard<200){
         stepBenchFixed();benchAcc-=BENCH.DT;guard++;
       }
+      if(guard>0)updateBenchResults();
       trailAcc+=dt;
       if(trailAcc>.06){trailAcc=0;
         pushTrail(bench.trailTrue,bench.truePose[0],bench.truePose[1]);
